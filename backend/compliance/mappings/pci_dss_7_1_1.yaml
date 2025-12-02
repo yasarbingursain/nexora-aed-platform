@@ -1,0 +1,61 @@
+control:
+  framework: PCI_DSS_4.0
+  id: "7.1.1"
+  name: Least Privilege Access
+  description: |
+    Access to system components and cardholder data is limited by role-based access 
+    controls to only those individuals whose job requires such access.
+
+owners:
+  control_owner: "sec-lead@nexora.ai"
+  evidence_owner: "compliance@nexora.ai"
+  technical_owner: "backend-team@nexora.ai"
+
+nexora_controls:
+  - detection_rule: NHI-001
+    evidence: |
+      Scope Drift Detection enforces least privilege by denying any privilege escalation
+      attempts. OPA policies enforce role-based access with PostgreSQL RLS.
+    mappings:
+      mitre_attack: ["T1078.004"]
+      soc2: ["CC6.1"]
+      iso_27001: ["A.9.2.3"]
+      nist_800_53: ["AC-6"]
+    automated: true
+    sla_seconds: 3
+
+  - detection_rule: NHI-004
+    evidence: |
+      Excessive Permission Usage: Monitors for identities using more permissions than
+      their baseline. Triggers review and potential permission reduction.
+    mappings:
+      mitre_attack: ["T1078"]
+      soc2: ["CC6.1"]
+      iso_27001: ["A.9.2.5"]
+    automated: true
+    sla_seconds: 300
+
+audit_procedures:
+  - Quarterly access review for all privileged accounts
+  - Monthly validation of OPA policy effectiveness
+  - Verify RLS policies prevent cross-tenant data access
+  - Annual third-party assessment of access controls
+
+evidence_locations:
+  - db://security.evidence_log
+  - db://threats
+  - s3://nexora-evidence/access-reviews/
+  - dashboard://compliance/pci-dss
+
+test_procedures:
+  - name: RLS Cross-Tenant Test
+    frequency: weekly
+    method: automated
+    last_tested: "2025-01-04"
+  
+  - name: Privilege Escalation Red Team
+    frequency: monthly
+    method: automated
+    last_tested: "2025-01-01"
+
+exceptions: []

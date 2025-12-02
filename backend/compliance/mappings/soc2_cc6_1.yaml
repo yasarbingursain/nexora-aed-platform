@@ -1,0 +1,80 @@
+control:
+  framework: SOC2_Type_II
+  id: CC6.1
+  name: Logical & Physical Access Controls
+  description: |
+    The entity implements logical access security software, infrastructure, and 
+    architectures over protected information assets to protect them from security events 
+    to meet the entity's objectives.
+
+owners:
+  control_owner: "sec-lead@nexora.ai"
+  evidence_owner: "compliance@nexora.ai"
+  technical_owner: "backend-team@nexora.ai"
+
+nexora_controls:
+  - detection_rule: NHI-001
+    evidence: |
+      Scope Drift Detection: Denies privilege escalations in real-time; logs all attempts;
+      quarantines suspicious identities within 3 seconds. Emits OCSF security event.
+    mappings:
+      mitre_attack: ["T1078.004"]
+      pci_dss: ["7.1.1", "7.2.1"]
+      iso_27001: ["A.8.2", "A.9.2.3"]
+      nist_800_53: ["AC-2", "AC-6"]
+    automated: true
+    sla_seconds: 3
+
+  - detection_rule: NHI-005
+    evidence: |
+      Token Lineage Break Detection: Validates parent_kid vs mint path; automatically
+      rotates compromised tokens; emits OCSF authentication event with lineage data.
+    mappings:
+      mitre_attack: ["T1550.001"]
+      pci_dss: ["8.2.3"]
+      iso_27001: ["A.9.4.2"]
+      nist_800_53: ["IA-5"]
+    automated: true
+    sla_seconds: 3
+
+  - detection_rule: NHI-003
+    evidence: |
+      New Region Anomaly: Detects identity access from unexpected geographic regions;
+      triggers step-up authentication; logs for security review.
+    mappings:
+      mitre_attack: ["T1078"]
+      pci_dss: ["8.2.1"]
+      iso_27001: ["A.9.4.1"]
+    automated: true
+    sla_seconds: 5
+
+audit_procedures:
+  - Quarterly review of detection rule hits and false positive rates
+  - Monthly red-team simulation for scope drift and lineage break scenarios
+  - Verify median time-to-mitigate (TTM) ≤ 3 seconds for critical detections
+  - Validate false positive rate < 5% for all automated controls
+  - Annual external penetration test of access control mechanisms
+
+evidence_locations:
+  - s3://nexora-evidence/detections/
+  - db://security.evidence_log
+  - db://threats
+  - dashboard://compliance/soc2
+
+test_procedures:
+  - name: Automated Detection Testing
+    frequency: daily
+    method: automated
+    last_tested: "2025-01-04"
+  
+  - name: Red Team Scope Drift Simulation
+    frequency: monthly
+    method: automated
+    last_tested: "2025-01-01"
+  
+  - name: Access Control Review
+    frequency: quarterly
+    method: manual
+    last_tested: "2024-12-15"
+
+exceptions: []

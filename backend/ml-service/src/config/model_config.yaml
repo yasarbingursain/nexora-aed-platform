@@ -1,0 +1,116 @@
+# ML Model Configuration for Nexora Threat Detection
+
+# Global Settings
+global:
+  random_state: 42
+  n_jobs: -1
+  model_registry_uri: "sqlite:///mlflow.db"
+  feature_store_enabled: false
+
+# Anomaly Detection Models
+anomaly_detection:
+  isolation_forest:
+    n_estimators: 200
+    contamination: 0.1
+    max_samples: "auto"
+    max_features: 1.0
+    bootstrap: false
+    
+  ocsvm:
+    kernel: "rbf"
+    gamma: "scale"
+    nu: 0.1
+    shrinking: true
+    
+  autoencoder:
+    input_dim: 50
+    encoding_dim: 20
+    hidden_layers: [40, 30, 20]
+    dropout_rate: 0.2
+    learning_rate: 0.001
+    epochs: 100
+    batch_size: 32
+    validation_split: 0.2
+
+# Entity Morphing Detection
+morphing_detection:
+  behavioral_drift:
+    window_size: 100
+    drift_threshold: 0.3
+    min_samples: 50
+    
+  entity_morphing:
+    similarity_threshold: 0.8
+    temporal_window: "24h"
+    feature_weights:
+      behavioral: 0.4
+      temporal: 0.3
+      network: 0.3
+
+# Feature Engineering
+features:
+  temporal:
+    time_windows: ["1h", "6h", "24h", "7d"]
+    aggregations: ["mean", "std", "min", "max", "count"]
+    
+  behavioral:
+    activity_patterns: true
+    access_patterns: true
+    resource_usage: true
+    
+  network:
+    connection_patterns: true
+    traffic_analysis: true
+    geo_location: true
+    
+  entity_graph:
+    node_features: true
+    edge_features: true
+    graph_metrics: true
+
+# Training Configuration
+training:
+  test_size: 0.2
+  validation_size: 0.2
+  cross_validation_folds: 5
+  hyperparameter_tuning:
+    enabled: true
+    n_trials: 100
+    timeout: 3600
+    
+# Model Ensemble
+ensemble:
+  enabled: true
+  voting_strategy: "soft"
+  weights: "uniform"
+  models:
+    - "isolation_forest"
+    - "ocsvm" 
+    - "autoencoder"
+
+# Thresholds and Alerts
+thresholds:
+  anomaly_score: 0.7
+  morphing_score: 0.8
+  drift_score: 0.6
+  
+alerts:
+  high_priority: 0.9
+  medium_priority: 0.7
+  low_priority: 0.5
+
+# Performance Monitoring
+monitoring:
+  model_drift_detection: true
+  performance_degradation_threshold: 0.1
+  retraining_schedule: "weekly"
+  
+# Data Processing
+data:
+  max_batch_size: 10000
+  feature_cache_ttl: 3600
+  preprocessing_pipeline:
+    - "missing_value_imputation"
+    - "outlier_removal"
+    - "feature_scaling"
+    - "feature_selection"

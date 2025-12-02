@@ -1,0 +1,76 @@
+control:
+  framework: GDPR
+  id: ARTICLE-32
+  name: Security of Processing
+  description: |
+    The controller and the processor shall implement appropriate technical and 
+    organizational measures to ensure a level of security appropriate to the risk.
+
+owners:
+  control_owner: "sec-lead@nexora.ai"
+  evidence_owner: "compliance@nexora.ai"
+  technical_owner: "backend-team@nexora.ai"
+
+nexora_controls:
+  - detection_rule: NHI-001
+    evidence: |
+      Real-time detection and prevention of unauthorized access attempts. Automated
+      quarantine and remediation within 3 seconds. All events logged to immutable
+      audit trail with hash-chain integrity.
+    mappings:
+      soc2: ["CC6.1"]
+      iso_27001: ["A.9.2.3", "A.12.4.1"]
+      nist_800_53: ["AC-2", "AC-6", "AU-2"]
+    automated: true
+    sla_seconds: 3
+
+  - detection_rule: AUDIT-001
+    evidence: |
+      Immutable audit log with SHA-256 hash-chain. Daily cosign signatures for
+      tamper-evidence. 7-year retention for compliance. Monthly partitioning for
+      performance.
+    mappings:
+      soc2: ["CC7.2"]
+      iso_27001: ["A.12.4.1"]
+      pci_dss: ["10.2"]
+    automated: true
+
+  - detection_rule: CRYPTO-001
+    evidence: |
+      TLS 1.3 for all communications. AES-256-GCM for data at rest. Post-quantum
+      cryptography metadata tracking. Automated key rotation every 90 days.
+    mappings:
+      pci_dss: ["8.2.3"]
+      iso_27001: ["A.10.1.1"]
+      nist_800_53: ["SC-8", "SC-13"]
+    automated: true
+
+audit_procedures:
+  - Quarterly security assessment of detection rules
+  - Monthly penetration testing of access controls
+  - Annual third-party security audit
+  - Continuous monitoring of encryption standards
+  - Weekly review of audit log integrity
+
+evidence_locations:
+  - db://security.evidence_log
+  - s3://nexora-evidence/security/
+  - dashboard://compliance/gdpr
+
+test_procedures:
+  - name: Encryption Validation
+    frequency: weekly
+    method: automated
+    last_tested: "2025-01-04"
+  
+  - name: Access Control Testing
+    frequency: monthly
+    method: automated
+    last_tested: "2025-01-01"
+  
+  - name: Audit Log Integrity Check
+    frequency: daily
+    method: automated
+    last_tested: "2025-01-04"
+
+exceptions: []

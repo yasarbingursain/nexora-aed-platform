@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["control", "owners", "nexora_controls", "audit_procedures", "evidence_locations"],
+  "properties": {
+    "control": {
+      "type": "object",
+      "required": ["framework", "id", "name"],
+      "properties": {
+        "framework": {
+          "type": "string",
+          "enum": ["SOC2_Type_II", "ISO27001", "PCI_DSS_4.0", "GDPR", "HIPAA", "DORA"]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9._-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "owners": {
+      "type": "object",
+      "required": ["control_owner", "evidence_owner"],
+      "properties": {
+        "control_owner": {
+          "type": "string",
+          "format": "email"
+        },
+        "evidence_owner": {
+          "type": "string",
+          "format": "email"
+        },
+        "technical_owner": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "nexora_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["detection_rule", "evidence"],
+        "properties": {
+          "detection_rule": {
+            "type": "string",
+            "pattern": "^[A-Z]+-[0-9]+$"
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 10
+          },
+          "mappings": {
+            "type": "object",
+            "properties": {
+              "mitre_attack": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+                }
+              },
+              "pci_dss": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "iso_27001": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nist_800_53": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "automated": {
+            "type": "boolean",
+            "default": true
+          },
+          "sla_seconds": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "audit_procedures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 10
+      }
+    },
+    "evidence_locations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^(s3://|db://|dashboard://|file://).+"
+      }
+    },
+    "test_procedures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "frequency", "method"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["daily", "weekly", "monthly", "quarterly", "annually"]
+          },
+          "method": {
+            "type": "string",
+            "enum": ["automated", "manual", "hybrid"]
+          },
+          "last_tested": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reason", "approved_by", "expires"],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "approved_by": {
+            "type": "string",
+            "format": "email"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date"
+          },
+          "compensating_controls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

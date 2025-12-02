@@ -1,0 +1,76 @@
+control:
+  framework: ISO27001
+  id: A.12.4.1
+  name: Event Logging
+  description: |
+    Event logs recording user activities, exceptions, faults and information security 
+    events shall be produced, kept and regularly reviewed.
+
+owners:
+  control_owner: "sec-lead@nexora.ai"
+  evidence_owner: "compliance@nexora.ai"
+  technical_owner: "backend-team@nexora.ai"
+
+nexora_controls:
+  - detection_rule: AUDIT-001
+    evidence: |
+      Comprehensive event logging to immutable audit trail. SHA-256 hash-chain for
+      tamper-evidence. Logs include: user actions, API calls, authentication events,
+      authorization decisions, detection rule hits, remediation actions.
+    mappings:
+      soc2: ["CC7.2"]
+      gdpr: ["Article_32"]
+      pci_dss: ["10.2", "10.3"]
+      nist_800_53: ["AU-2", "AU-3", "AU-6"]
+    automated: true
+
+  - detection_rule: NHI-001
+    evidence: |
+      All security events (scope drift, privilege escalation, access violations) are
+      logged with full context: identity, action, resource, timestamp, IP, user agent,
+      decision outcome.
+    mappings:
+      soc2: ["CC6.1"]
+      pci_dss: ["10.2.5"]
+    automated: true
+    sla_seconds: 3
+
+  - detection_rule: AUDIT-002
+    evidence: |
+      Automated daily review of security events. Anomaly detection on log patterns.
+      Alerts for suspicious activity. Weekly manual review by security team.
+    mappings:
+      soc2: ["CC7.2"]
+      pci_dss: ["10.6"]
+    automated: true
+
+audit_procedures:
+  - Daily automated log review with anomaly detection
+  - Weekly manual security log review by SOC team
+  - Monthly log retention and archival verification
+  - Quarterly log integrity verification (hash-chain)
+  - Annual external audit of logging practices
+
+evidence_locations:
+  - db://security.evidence_log
+  - db://audit_logs
+  - s3://nexora-evidence/logs/
+  - dashboard://compliance/iso27001
+
+test_procedures:
+  - name: Log Completeness Check
+    frequency: daily
+    method: automated
+    last_tested: "2025-01-04"
+  
+  - name: Hash Chain Verification
+    frequency: weekly
+    method: automated
+    last_tested: "2025-01-04"
+  
+  - name: Log Review Process Audit
+    frequency: monthly
+    method: manual
+    last_tested: "2024-12-15"
+
+exceptions: []

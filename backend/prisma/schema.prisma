@@ -1,0 +1,453 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Organizations (Multi-tenancy)
+model Organization {
+  id                String              @id @default(cuid())
+  name              String
+  domain            String?             @unique
+  subscriptionTier  String              @default("free") // free, pro, enterprise
+  status            OrganizationStatus  @default(ACTIVE)
+  maxUsers          Int                 @default(5)
+  maxIdentities     Int                 @default(100)
+  settings          String              @default("{}") // JSON as string for SQLite
+  suspendedAt       DateTime?
+  suspensionReason  String?
+  deletedAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  users             User[]
+  identities        Identity[]
+  threats           Threat[]
+  incidents         Incident[]
+  auditLogs         AuditLog[]
+  apiKeys           ApiKey[]
+  playbooks         Playbook[]
+  complianceReports ComplianceReport[]
+  baselines         Baseline[]
+  observations      Observation[]
+  actions           Action[]
+  securityEvents    SecurityEvent[]
+  adminActions      AdminAuditLog[]
+
+  @@map("organizations")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+// Users
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String
+  fullName       String
+  role           String    @default("viewer") // admin, analyst, viewer, auditor, super_admin
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  mfaEnabled     Boolean   @default(false)
+  mfaSecret      String?
+  organizationId String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  sessions       UserSession[]
+  adminActions   AdminAuditLog[] @relation("AdminActions")
+  securityEvents SecurityEvent[]
+
+  @@map("users")
+}
+
+// Refresh Tokens
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// User Sessions
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceInfo   String?
+  ipAddress    String
+  userAgent    String?
+  isActive     Boolean  @default(true)
+  lastActivity DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// API Keys
+model ApiKey {
+  id             String   @id @default(cuid())
+  name           String
+  keyHash        String   @unique
+  permissions    String   @default("") // array of permissions as comma-separated
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// Identities (NHI - Non-Human Identities)
+model Identity {
+  id               String    @id @default(cuid())
+  name             String
+  type             String    // api_key, service_account, ssh_key, certificate, ai_agent, bot
+  provider         String    // aws, azure, gcp, github, gitlab, kubernetes, custom
+  externalId       String?   // provider-specific ID
+  status           String    @default("active") // active, inactive, compromised, quarantined
+  riskLevel        String    @default("low") // low, medium, high, critical
+  owner            String?   // email of responsible person
+  description      String?
+  tags             String    @default("")
+  credentials      String    @default("{}") // encrypted credential data as JSON string
+  metadata         String    @default("{}")
+  lastSeenAt       DateTime?
+  lastRotatedAt    DateTime?
+  rotationInterval Int?      // days
+  organizationId   String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activities       IdentityActivity[]
+  threats          Threat[]
+  actions          Action[]
+  baselines        Baseline[]
+  observations     Observation[]
+
+  @@map("identities")
+}
+
+// Identity Activities (behavioral data)
+model IdentityActivity {
+  id         String   @id @default(cuid())
+  identityId String
+  activity   String   // login, api_call, file_access, etc.
+  source     String   // ip_address, user_agent, etc.
+  metadata   String   @default("{}")
+  timestamp  DateTime @default(now())
+
+  // Relations
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@map("identity_activities")
+}
+
+// Behavioral Baselines
+model Baseline {
+  id               String   @id @default(cuid())
+  identityId       String
+  behaviorType     String   // login_pattern, api_usage, location, etc.
+  baselineData     String   @default("{}") // statistical baseline data as JSON string
+  confidence       Float    @default(0.0)
+  lastUpdated      DateTime @default(now())
+  organizationId   String
+
+  // Relations
+  identity     Identity     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("baselines")
+}
+
+// Real-time Observations
+model Observation {
+  id             String   @id @default(cuid())
+  identityId     String
+  observationType String   // behavior, anomaly, threat_indicator
+  data           String   @default("{}")
+  anomalyScore   Float?
+  timestamp      DateTime @default(now())
+  organizationId String
+
+  // Relations
+  identity     Identity     @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("observations")
+}
+
+// Threats
+model Threat {
+  id             String    @id @default(cuid())
+  title          String
+  description    String
+  severity       String    @default("medium") // low, medium, high, critical
+  status         String    @default("open") // open, investigating, resolved, false_positive
+  category       String    // credential_abuse, privilege_escalation, data_exfiltration, etc.
+  identityId     String?
+  sourceIp       String?
+  indicators     String    @default("[]") // IOCs as JSON string
+  evidence       String    @default("{}")
+  mitreTactics   String    @default("") // MITRE ATT&CK tactics as comma-separated
+  mitreId        String?   // MITRE ATT&CK technique ID
+  assignedTo     String?   // user email
+  resolvedAt     DateTime?
+  organizationId String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  identity     Identity?    @relation(fields: [identityId], references: [id])
+  incidents    Incident[]
+  actions      Action[]
+
+  @@map("threats")
+}
+
+// Incidents (grouped threats)
+model Incident {
+  id             String   @id @default(cuid())
+  title          String
+  description    String
+  severity       String   @default("medium")
+  status         String   @default("open")
+  assignedTo     String?
+  dossier        String   @default("{}")
+  compliance     String   @default("{}")
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  threats      Threat[]
+
+  @@map("incidents")
+}
+
+// Remediation Actions
+model Action {
+  id             String    @id @default(cuid())
+  type           String    // rotate, quarantine, deception, rollback, notify
+  status         String    @default("pending") // pending, running, completed, failed
+  identityId     String?
+  threatId       String?
+  playbookId     String?
+  parameters     String    @default("{}")
+  result         String?
+  rollbackPlan   String?
+  executedAt     DateTime?
+  completedAt    DateTime?
+  organizationId String
+  createdAt      DateTime  @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  identity     Identity?    @relation(fields: [identityId], references: [id])
+  threat       Threat?      @relation(fields: [threatId], references: [id])
+  playbook     Playbook?    @relation(fields: [playbookId], references: [id])
+
+  @@map("actions")
+}
+
+// Remediation Playbooks
+model Playbook {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  trigger        String   @default("{}") // trigger conditions as JSON string
+  actions        String   @default("[]") // array of actions to execute as JSON string
+  isActive       Boolean  @default(true)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  executions   Action[]
+
+  @@map("playbooks")
+}
+
+// Compliance Reports
+model ComplianceReport {
+  id             String    @id @default(cuid())
+  framework      String    // soc2, iso27001, pci_dss, hipaa, etc.
+  reportType     String    // audit, assessment, evidence
+  status         String    @default("generating") // generating, completed, failed
+  data           String?
+  filePath       String?
+  generatedAt    DateTime?
+  organizationId String
+  createdAt      DateTime  @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("compliance_reports")
+}
+
+// Audit Logs
+model AuditLog {
+  id             String   @id @default(cuid())
+  userId         String?
+  action         String   // API endpoint or action taken
+  resource       String?  // resource affected
+  ipAddress      String
+  userAgent      String?
+  requestBody    String?
+  responseStatus Int?
+  duration       Int?     // milliseconds
+  organizationId String
+  timestamp      DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// System Uptime Metrics (for SLO tracking)
+model SystemUptimeMetric {
+  id             String   @id @default(cuid())
+  serviceName    String
+  status         String   // up, down, degraded
+  responseTimeMs Int?
+  errorRate      Float?
+  metadata       String   @default("{}") // JSON as string
+  timestamp      DateTime @default(now())
+
+  @@map("system_uptime_metrics")
+}
+
+// Vendor Risk Assessments
+model VendorAssessment {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  vendorName            String
+  vendorDomain          String?
+  vendorType            String    // saas, infrastructure, security, data_processor, consultant, other
+  riskLevel             String    // low, medium, high, critical
+  riskScore             Float?
+  lastAssessedAt        DateTime
+  nextAssessmentDue     DateTime
+  soc2Certified         Boolean   @default(false)
+  iso27001Certified     Boolean   @default(false)
+  gdprCompliant         Boolean   @default(false)
+  hipaaCompliant        Boolean   @default(false)
+  questionnaireCompleted Boolean  @default(false)
+  questionnaireScore    Float?
+  questionnaireDate     DateTime?
+  contractStartDate     DateTime?
+  contractEndDate       DateTime?
+  dataProcessed         String?   // JSON array as string
+  dataLocation          String?   // JSON array as string
+  status                String    @default("active") // active, inactive, under_review, terminated
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([organizationId, vendorName])
+  @@map("vendor_assessments")
+}
+
+// DORA ICT Incidents
+model DoraIctIncident {
+  id                     String    @id @default(cuid())
+  organizationId         String
+  incidentType           String    // cyber_attack, system_failure, data_loss, service_disruption, etc.
+  severity               String    // major, significant, minor
+  detectedAt             DateTime
+  reportedToAuthorityAt  DateTime?
+  resolvedAt             DateTime?
+  servicesAffected       String?   // JSON array as string
+  usersAffected          Int?
+  financialImpact        Float?
+  dataCompromised        Boolean   @default(false)
+  rootCause              String?
+  contributingFactors    String?   // JSON array as string
+  immediateActions       String?
+  remediationPlan        String?
+  lessonsLearned         String?
+  authorityNotified      Boolean   @default(false)
+  notificationMethod     String?
+  reportReference        String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@map("dora_ict_incidents")
+}
+
+// Admin Audit Logs
+model AdminAuditLog {
+  id             String        @id @default(cuid())
+  adminId        String
+  action         String        // CREATE_ORGANIZATION, UPDATE_ORGANIZATION, SUSPEND_USER, etc.
+  resourceType   String        // organization, user, system
+  resourceId     String
+  details        String        @default("{}") // JSON as string
+  ipAddress      String?
+  userAgent      String?
+  organizationId String?
+  createdAt      DateTime      @default(now())
+
+  // Relations
+  admin          User          @relation("AdminActions", fields: [adminId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("admin_audit_logs")
+}
+
+// Security Events
+model SecurityEvent {
+  id             String        @id @default(cuid())
+  type           String        // failed_login, suspicious_activity, unauthorized_access, etc.
+  severity       String        // low, medium, high, critical
+  description    String
+  sourceIp       String?
+  userId         String?
+  organizationId String?
+  details        String        @default("{}") // JSON as string
+  resolved       Boolean       @default(false)
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  // Relations
+  user           User?         @relation(fields: [userId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@map("security_events")
+}

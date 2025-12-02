@@ -1,0 +1,79 @@
+# Detection Rule Schema
+# JSON Schema for validating detection rules
+# Enterprise-grade validation for security detection rules
+
+type: array
+items:
+  type: object
+  required: [name, description, severity, condition, action, metadata]
+  properties:
+    name:
+      type: string
+      minLength: 3
+      pattern: "^[a-z0-9_]+$"
+      description: "Rule identifier (snake_case)"
+    
+    description:
+      type: string
+      minLength: 10
+      description: "Human-readable rule description"
+    
+    severity:
+      type: string
+      enum: [low, medium, high, critical]
+      description: "Rule severity level"
+    
+    action:
+      type: string
+      enum: [allow, deny, step_up_auth, rotate_immediately, quarantine, notify]
+      description: "Action to take when rule matches"
+    
+    condition:
+      type: string
+      minLength: 3
+      description: "Rule condition expression (DSL)"
+    
+    metadata:
+      type: object
+      required: [mitre_attack]
+      properties:
+        mitre_attack:
+          type: array
+          items:
+            type: string
+            pattern: "^T[0-9]{4}(\\.[0-9]{3})?$"
+          description: "MITRE ATT&CK technique IDs"
+        
+        pci_dss:
+          type: array
+          items:
+            type: string
+          description: "PCI DSS control references"
+        
+        nist:
+          type: array
+          items:
+            type: string
+          description: "NIST control references"
+        
+        tags:
+          type: array
+          items:
+            type: string
+          description: "Custom tags for categorization"
+        
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: "Rule confidence score (0-100)"
+    
+    enabled:
+      type: boolean
+      default: true
+      description: "Whether rule is active"
+    
+    ttl_seconds:
+      type: integer
+      minimum: 60
+      description: "Time-to-live for temporary actions"
