@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '@/controllers/auth.controller';
+import { TokenRotationService } from '@/services/token-rotation.service';
 import { validate } from '@/middleware/validation.middleware';
 import { requireAuth, requireRole } from '@/middleware/auth.middleware';
 import { authRateLimit } from '@/middleware/rateLimiter.middleware';
@@ -29,9 +30,10 @@ router.post('/login',
   AuthController.login
 );
 
+// SPRINT 2: Token rotation for replay attack prevention
 router.post('/refresh', 
   validate(refreshTokenSchema),
-  AuthController.refresh
+  TokenRotationService.refreshWithRotation
 );
 
 router.post('/forgot-password',

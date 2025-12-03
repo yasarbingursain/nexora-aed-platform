@@ -1,16 +1,17 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@/config/database';
 import { env } from '@/config/env';
 import { AuthenticatedUser } from '@/middleware/auth.middleware';
+import { getClientIP, getUserAgent } from '@/utils/request-helpers';
 
 export class AuthController {
   // Register new organization and first user
-  static async register(req: Request, res: Response) {
+  static async register(req: Request, res: Response): Promise<void> {
     try {
       const { organizationName, email, password, fullName } = req.body;
 
@@ -65,13 +66,13 @@ export class AuthController {
           role: result.user.role,
         },
         env.JWT_SECRET,
-        { expiresIn: env.JWT_EXPIRES_IN }
+        { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
       );
 
       const refreshToken = jwt.sign(
         { userId: result.user.id },
         env.JWT_REFRESH_SECRET,
-        { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
+        { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as SignOptions
       );
 
       // Store refresh token
@@ -87,9 +88,9 @@ export class AuthController {
       await prisma.userSession.create({
         data: {
           userId: result.user.id,
-          ipAddress: req.ip,
-          userAgent: req.headers['user-agent'] || '',
-          deviceInfo: req.headers['user-agent'] || '',
+          ipAddress: getClientIP(req),
+          userAgent: getUserAgent(req),
+          deviceInfo: getUserAgent(req),
         },
       });
 
@@ -119,7 +120,7 @@ export class AuthController {
   }
 
   // Login user
-  static async login(req: Request, res: Response) {
+  static async login(req: Request, res: Response): Promise<void> {
     try {
       const { email, password, mfaToken } = req.body;
 
@@ -178,13 +179,13 @@ export class AuthController {
           role: user.role,
         },
         env.JWT_SECRET,
-        { expiresIn: env.JWT_EXPIRES_IN }
+        { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
       );
 
       const refreshToken = jwt.sign(
         { userId: user.id },
         env.JWT_REFRESH_SECRET,
-        { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
+        { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as SignOptions
       );
 
       // Store refresh token
@@ -205,9 +206,9 @@ export class AuthController {
         prisma.userSession.create({
           data: {
             userId: user.id,
-            ipAddress: req.ip,
-            userAgent: req.headers['user-agent'] || '',
-            deviceInfo: req.headers['user-agent'] || '',
+            ipAddress: getClientIP(req),
+            userAgent: getUserAgent(req),
+            deviceInfo: getUserAgent(req),
           },
         }),
       ]);
@@ -239,7 +240,7 @@ export class AuthController {
   }
 
   // Refresh access token
-  static async refresh(req: Request, res: Response) {
+  static async refresh(req: Request, res: Response): Promise<void> {
     try {
       const { refreshToken } = req.body;
 
@@ -276,7 +277,7 @@ export class AuthController {
           role: tokenRecord.user.role,
         },
         env.JWT_SECRET,
-        { expiresIn: env.JWT_EXPIRES_IN }
+        { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
       );
 
       res.json({
@@ -299,7 +300,7 @@ export class AuthController {
   }
 
   // Logout user
-  static async logout(req: Request, res: Response) {
+  static async logout(req: Request, res: Response): Promise<void> {
     try {
       const { refreshToken } = req.body;
       const user = req.user as AuthenticatedUser;
@@ -338,7 +339,7 @@ export class AuthController {
   }
 
   // Setup MFA
-  static async setupMfa(req: Request, res: Response) {
+  static async setupMfa(req: Request, res: Response): Promise<void> {
     try {
       const user = req.user as AuthenticatedUser;
 
@@ -373,7 +374,7 @@ export class AuthController {
   }
 
   // Verify and enable MFA
-  static async verifyMfa(req: Request, res: Response) {
+  static async verifyMfa(req: Request, res: Response): Promise<void> {
     try {
       const { token } = req.body;
       const user = req.user as AuthenticatedUser;
@@ -426,7 +427,7 @@ export class AuthController {
   }
 
   // Disable MFA
-  static async disableMfa(req: Request, res: Response) {
+  static async disableMfa(req: Request, res: Response): Promise<void> {
     try {
       const user = req.user as AuthenticatedUser;
 
@@ -452,7 +453,7 @@ export class AuthController {
   }
 
   // Get current user profile
-  static async getProfile(req: Request, res: Response) {
+  static async getProfile(req: Request, res: Response): Promise<void> {
     try {
       const user = req.user as AuthenticatedUser;
 

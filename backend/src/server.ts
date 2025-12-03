@@ -10,6 +10,7 @@ import { redis } from '@/config/redis';
 import { globalRateLimit } from '@/middleware/rateLimiter.middleware';
 import { applySecurity } from '@/middleware/security.middleware';
 import { auditMiddleware } from '@/middleware/audit.middleware';
+import { enforceRowLevelSecurity, verifyRLSEnabled } from '@/middleware/rls.middleware';
 import { setupWebSocket, initializeThreatFeed } from '@/services/websocket.service';
 import { logger } from '@/utils/logger';
 import { metricsHandler, metricsMiddleware, startMetricsCollection } from '@/utils/metrics';
@@ -67,6 +68,9 @@ app.use(metricsMiddleware);
 
 // Audit logging middleware (logs all API calls)
 app.use(auditMiddleware);
+
+// SPRINT 2: Row-Level Security enforcement
+app.use(enforceRowLevelSecurity);
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -303,7 +307,7 @@ if (env.ENABLE_WEBSOCKETS && process.env.KAFKA_BROKERS) {
 // Start server
 const PORT = env.PORT || 8080;
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, async () => {
   logger.info(`🚀 Nexora AED Platform API Server started`, {
     port: PORT,
     environment: env.NODE_ENV,
@@ -311,6 +315,22 @@ httpServer.listen(PORT, () => {
     websockets: env.ENABLE_WEBSOCKETS,
     osintIngestion: process.env.ENABLE_OSINT_INGESTION === 'true',
   });
+  
+  // SPRINT 2: Verify Row-Level Security is enabled
+  try {
+    const rlsStatus = await verifyRLSEnabled();
+    if (rlsStatus.enabled) {
+      logger.info('✅ Row-Level Security verified', {
+        tablesProtected: rlsStatus.tables.length,
+      });
+    } else {
+      logger.error('⚠️ Row-Level Security verification failed', {
+        errors: rlsStatus.errors,
+      });
+    }
+  } catch (error) {
+    logger.error('Failed to verify RLS', { error });
+  }
   
   logger.info(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
   logger.info(`❤️ Health Check: http://localhost:${PORT}/health`);

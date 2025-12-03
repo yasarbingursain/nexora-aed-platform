@@ -82,3 +82,8 @@ if (env.NODE_ENV === 'production') {
     new winston.transports.File({ filename: 'logs/rejections.log' })
   );
 }
+
+// SECURITY FIX: Add security logging method
+(logger as any).security = (message: string, meta?: any) => {
+  logger.warn(`[SECURITY] ${message}`, { ...meta, securityEvent: true });
+};

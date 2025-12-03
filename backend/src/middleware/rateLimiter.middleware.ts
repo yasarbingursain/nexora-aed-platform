@@ -40,8 +40,8 @@ const apiKeyRateLimiter = new RateLimiterRedis({
 
 export const globalRateLimit = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const key = req.ip;
-    await globalRateLimiter.consume(key);
+    const key = req.ip || 'unknown';
+    await globalRateLimiter.consume(key as string);
     next();
   } catch (rejRes: any) {
     const remainingPoints = rejRes?.remainingPoints || 0;
@@ -62,7 +62,7 @@ export const globalRateLimit = async (req: Request, res: Response, next: NextFun
   }
 };
 
-export const organizationRateLimit = async (req: Request, res: Response, next: NextFunction) => {
+export const organizationRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.user?.organizationId) {
       return next(); // Skip if no organization context
@@ -92,8 +92,8 @@ export const organizationRateLimit = async (req: Request, res: Response, next: N
 
 export const authRateLimit = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const key = req.ip;
-    await authRateLimiter.consume(key);
+    const key = req.ip || 'unknown';
+    await authRateLimiter.consume(key as string);
     next();
   } catch (rejRes: any) {
     const remainingPoints = rejRes?.remainingPoints || 0;
@@ -114,7 +114,7 @@ export const authRateLimit = async (req: Request, res: Response, next: NextFunct
   }
 };
 
-export const apiKeyRateLimit = async (req: Request, res: Response, next: NextFunction) => {
+export const apiKeyRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const apiKey = req.headers['x-api-key'] as string;
     if (!apiKey) {
@@ -159,11 +159,8 @@ export const createEndpointRateLimit = (
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const key = req.user?.organizationId 
-        ? `${req.user.organizationId}:${req.ip}`
-        : req.ip;
-      
-      await limiter.consume(key);
+      const key = `${keyPrefix}:${req.ip || 'unknown'}`;
+      await limiter.consume(key as string);
       next();
     } catch (rejRes: any) {
       const remainingPoints = rejRes?.remainingPoints || 0;

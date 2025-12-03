@@ -5,11 +5,12 @@ import { metricsService } from '@/services/metrics.service';
 import { billingService } from '@/services/billing.service';
 import { auditService } from '@/services/audit.service';
 import { logger } from '@/utils/logger';
+import { getClientIP, getUserAgent, getRequiredParam } from '@/utils/request-helpers';
 
 export class AdminController {
   
   // Organization Management
-  async getAllOrganizations(req: Request, res: Response) {
+  async getAllOrganizations(req: Request, res: Response): Promise<void> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -42,9 +43,17 @@ export class AdminController {
     }
   }
 
-  async getOrganization(req: Request, res: Response) {
+  async getOrganization(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Organization ID is required'
+        });
+      }
+      
       const organization = await organizationService.getOrganizationById(id);
       
       if (!organization) {
@@ -56,8 +65,8 @@ export class AdminController {
 
       // Get additional details
       const [stats, metrics] = await Promise.all([
-        organizationService.getOrganizationStats(id),
-        metricsService.getOrganizationMetrics(id)
+        organizationService.getOrganizationStats(id as string),
+        metricsService.getOrganizationMetrics(id as string)
       ]);
 
       res.json({
@@ -77,7 +86,7 @@ export class AdminController {
     }
   }
 
-  async createOrganization(req: Request, res: Response) {
+  async createOrganization(req: Request, res: Response): Promise<void> {
     try {
       const organizationData = req.body;
       const adminId = req.user!.userId;
@@ -94,8 +103,8 @@ export class AdminController {
         resourceType: 'organization',
         resourceId: organization.id,
         details: organizationData,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.status(201).json({
@@ -111,9 +120,9 @@ export class AdminController {
     }
   }
 
-  async updateOrganization(req: Request, res: Response) {
+  async updateOrganization(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getRequiredParam(req, 'id');
       const updateData = req.body;
       const adminId = req.user!.userId;
 
@@ -125,8 +134,8 @@ export class AdminController {
         resourceType: 'organization',
         resourceId: id,
         details: updateData,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({
@@ -142,9 +151,9 @@ export class AdminController {
     }
   }
 
-  async deleteOrganization(req: Request, res: Response) {
+  async deleteOrganization(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getRequiredParam(req, 'id');
       const adminId = req.user!.userId;
 
       await organizationService.deleteOrganization(id);
@@ -154,8 +163,8 @@ export class AdminController {
         action: 'DELETE_ORGANIZATION',
         resourceType: 'organization',
         resourceId: id,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({
@@ -171,11 +180,18 @@ export class AdminController {
     }
   }
 
-  async suspendOrganization(req: Request, res: Response) {
+  async suspendOrganization(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      const adminId = req.user!.userId;
+      const id = getRequiredParam(req, 'id');
+      const reason = req.body.reason;
+      const adminId = req.user?.userId;
+
+      if (!adminId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized'
+        });
+      }
 
       await organizationService.suspendOrganization(id, reason);
 
@@ -185,8 +201,8 @@ export class AdminController {
         resourceType: 'organization',
         resourceId: id,
         details: { reason },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({
@@ -202,10 +218,17 @@ export class AdminController {
     }
   }
 
-  async reactivateOrganization(req: Request, res: Response) {
+  async reactivateOrganization(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
-      const adminId = req.user!.userId;
+      const id = getRequiredParam(req, 'id');
+      const adminId = req.user?.userId;
+
+      if (!adminId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized'
+        });
+      }
 
       await organizationService.reactivateOrganization(id);
 
@@ -214,8 +237,8 @@ export class AdminController {
         action: 'REACTIVATE_ORGANIZATION',
         resourceType: 'organization',
         resourceId: id,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({
@@ -326,11 +349,18 @@ export class AdminController {
     }
   }
 
-  async suspendUser(req: Request, res: Response) {
+  async suspendUser(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getRequiredParam(req, 'id');
       const { reason } = req.body;
-      const adminId = req.user!.userId;
+      const adminId = req.user?.userId;
+
+      if (!adminId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized'
+        });
+      }
 
       await userService.suspendUser(id, reason);
 
@@ -340,8 +370,8 @@ export class AdminController {
         resourceType: 'user',
         resourceId: id,
         details: { reason },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({
@@ -357,9 +387,9 @@ export class AdminController {
     }
   }
 
-  async reactivateUser(req: Request, res: Response) {
+  async reactivateUser(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getRequiredParam(req, 'id');
       const adminId = req.user!.userId;
 
       await userService.reactivateUser(id);
@@ -369,8 +399,8 @@ export class AdminController {
         action: 'REACTIVATE_USER',
         resourceType: 'user',
         resourceId: id,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req)
       });
 
       res.json({

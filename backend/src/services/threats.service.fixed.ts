@@ -1,14 +1,7 @@
-import { threatRepository } from '@/repositories/threats.repository';
-import { logger } from '@/utils/logger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import type {
-  CreateThreatInput,
-  UpdateThreatInput,
-  ListThreatsQuery,
-  InvestigateThreatInput,
-  RemediateThreatInput,
-} from '@/validators/threats.validator';
+import { threatRepository } from '@/repositories/threats.repository';
+import { logger } from '@/utils/logger';
 
 /**
  * SECURITY FIX: CWE-502 - Deserialization of Untrusted Data
@@ -35,60 +28,72 @@ const ThreatEvidenceSchema = z.object({
   artifacts: z.array(z.string()).max(50).optional(),
 }).strict();
 
-/**
- * Threat Service
- * 
- * Business logic for threat detection and management
- * - All operations scoped to organizationId
- */
+// Allowed fields for statistics aggregation (CWE-400 protection)
+const ALLOWED_STATS_FIELDS = ['severity', 'status', 'category'] as const;
+type AllowedStatsField = typeof ALLOWED_STATS_FIELDS[number];
 
-export class ThreatService {
+interface CreateThreatInput {
+  title: string;
+  description: string;
+  severity: string;
+  category: string;
+  identityId?: string;
+  sourceIp?: string;
+  indicators?: any;
+  evidence?: any;
+  mitreTactics?: string[];
+  mitreId?: string;
+}
+
+interface UpdateThreatInput {
+  title?: string;
+  description?: string;
+  severity?: string;
+  status?: string;
+  category?: string;
+  assignedTo?: string;
+  sourceIp?: string;
+  indicators?: any;
+  evidence?: any;
+  mitreTactics?: string[];
+  mitreId?: string;
+}
+
+interface InvestigateThreatInput {
+  assignedTo?: string;
+  notes?: string;
+}
+
+interface RemediateThreatInput {
+  action: string;
+  playbookId?: string;
+  notes?: string;
+}
+
+class ThreatService {
   /**
-   * List threats with pagination and filtering
+   * Find all threats with pagination
    */
-  async list(organizationId: string, query: ListThreatsQuery) {
-    const { page = 1, limit = 20, severity, status, category, identityId, assignedTo, dateFrom, dateTo, search, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+  async findAll(
+    organizationId: string,
+    filters: {
+      severity?: string;
+      status?: string;
+      category?: string;
+      identityId?: string;
+      assignedTo?: string;
+    } = {},
+    pagination: { page?: number; limit?: number } = {}
+  ) {
+    const page = pagination.page || 1;
+    const limit = Math.min(pagination.limit || 20, 100); // Max 100 per page
 
-    const skip = (page - 1) * Math.min(limit, 100);
-
-    // Build where clause
-    const where: Prisma.ThreatWhereInput = {
-      organizationId,  // CRITICAL: Always filter by org
-    };
-
-    if (severity) where.severity = severity;
-    if (status) where.status = status;
-    if (category) where.category = category;
-    if (identityId) where.identityId = identityId;
-    if (assignedTo) where.assignedTo = assignedTo;
-    if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
-    }
-    if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-        { category: { contains: search } },
-      ];
-    }
-
-    // Build order by
-    const orderBy: Prisma.ThreatOrderByWithRelationInput = {
-      [sortBy]: sortOrder,
-    };
-
-    // Execute queries
-    const [threats, total] = await Promise.all([
-      threatRepository.findAll(organizationId, { skip, take: Math.min(limit, 100), where, orderBy }),
-      threatRepository.count(organizationId, where),
-    ]);
+    const result = await threatRepository.findAll(organizationId, filters, { page, limit });
 
     // SECURITY: Validate indicators and evidence on read
-    const validatedThreats = threats.map((threat) => {
-      let indicators: any[] = [];
-      let evidence: any = {};
+    const threats = result.data.map((threat) => {
+      let indicators = [];
+      let evidence = {};
 
       try {
         indicators = ThreatIndicatorsSchema.parse(JSON.parse(threat.indicators || '[]'));
@@ -118,20 +123,14 @@ export class ThreatService {
 
     logger.info('Threats listed', {
       organizationId,
-      count: validatedThreats.length,
-      total,
+      count: threats.length,
+      total: result.meta.total,
       page,
-      limit,
     });
 
     return {
-      data: validatedThreats,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: threats,
+      meta: result.meta,
     };
   }
 
@@ -147,7 +146,7 @@ export class ThreatService {
     }
 
     // SECURITY: Validate indicators
-    let indicators: any[] = [];
+    let indicators = [];
     try {
       indicators = ThreatIndicatorsSchema.parse(JSON.parse(threat.indicators || '[]'));
     } catch (error) {
@@ -160,7 +159,7 @@ export class ThreatService {
     }
 
     // SECURITY: Validate evidence
-    let evidence: any = {};
+    let evidence = {};
     try {
       evidence = ThreatEvidenceSchema.parse(JSON.parse(threat.evidence || '{}'));
     } catch (error) {
@@ -241,7 +240,6 @@ export class ThreatService {
     // Verify threat exists
     await this.getById(id, organizationId);
 
-    // Prepare update data
     const updateData: Prisma.ThreatUpdateInput = {
       ...(data.title && { title: data.title }),
       ...(data.description && { description: data.description }),
@@ -286,13 +284,10 @@ export class ThreatService {
    * Delete threat
    */
   async delete(id: string, organizationId: string) {
-    // Verify threat exists
     await this.getById(id, organizationId);
-
     await threatRepository.delete(id, organizationId);
 
     logger.info('Threat deleted', { id, organizationId });
-
     return { success: true, message: 'Threat deleted successfully' };
   }
 
@@ -300,13 +295,10 @@ export class ThreatService {
    * Update threat status
    */
   async updateStatus(id: string, organizationId: string, status: string) {
-    // Verify threat exists
     await this.getById(id, organizationId);
-
     await threatRepository.updateStatus(id, organizationId, status);
 
     logger.info('Threat status updated', { id, organizationId, status });
-
     return this.getById(id, organizationId);
   }
 
@@ -314,13 +306,9 @@ export class ThreatService {
    * Investigate threat
    */
   async investigate(id: string, organizationId: string, data: InvestigateThreatInput) {
-    // Verify threat exists
-    const threat = await this.getById(id, organizationId);
-
-    // Update status to investigating
+    await this.getById(id, organizationId);
     await threatRepository.updateStatus(id, organizationId, 'investigating');
 
-    // Assign if provided
     if (data.assignedTo) {
       await threatRepository.assign(id, organizationId, data.assignedTo);
     }
@@ -342,7 +330,6 @@ export class ThreatService {
    * Remediate threat
    */
   async remediate(id: string, organizationId: string, data: RemediateThreatInput) {
-    // Verify threat exists
     await this.getById(id, organizationId);
 
     logger.info('Threat remediation initiated', {
@@ -366,7 +353,7 @@ export class ThreatService {
    * Search threats
    */
   async search(organizationId: string, searchTerm: string, limit: number = 20) {
-    const threats = await threatRepository.search(organizationId, searchTerm, limit);
+    const threats = await threatRepository.search(organizationId, searchTerm, Math.min(limit, 100));
 
     logger.info('Threats searched', {
       organizationId,
@@ -378,7 +365,7 @@ export class ThreatService {
   }
 
   /**
-   * Get threat statistics
+   * Get threat statistics using database aggregation (CWE-400 fix)
    */
   async getStatistics(organizationId: string) {
     const [
@@ -408,18 +395,20 @@ export class ThreatService {
   }
 
   /**
-   * Helper: Get count by field
+   * SECURITY FIX: CWE-400 - Use database aggregation instead of loading all records
+   * Helper: Get count by field using Prisma groupBy
    */
-  private async getCountByField(organizationId: string, field: string) {
-    const threats = await threatRepository.findAll(organizationId, {});
-    const counts: Record<string, number> = {};
-
-    for (const threat of threats) {
-      const value = (threat as any)[field];
-      counts[value] = (counts[value] || 0) + 1;
+  private async getCountByField(organizationId: string, field: AllowedStatsField) {
+    // Validate field is in allowlist
+    if (!ALLOWED_STATS_FIELDS.includes(field)) {
+      logger.error('Invalid stats field requested', { field, organizationId });
+      throw new Error(`Invalid field: ${field}`);
     }
 
-    return counts;
+    // Use Prisma groupBy for efficient database aggregation
+    const result = await threatRepository.groupByField(organizationId, field);
+    
+    return result;
   }
 }
 

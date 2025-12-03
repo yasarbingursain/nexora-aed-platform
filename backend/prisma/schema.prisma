@@ -64,6 +64,11 @@ model User {
   organizationId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  
+  // SECURITY FIX: CWE-307 - Account Lockout Fields
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
+  lastFailedLogin     DateTime?
 
   // Relations
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -73,6 +78,8 @@ model User {
   adminActions   AdminAuditLog[] @relation("AdminActions")
   securityEvents SecurityEvent[]
 
+  @@index([lockedUntil])
+  @@index([email, lockedUntil])
   @@map("users")
 }
 
@@ -92,18 +99,25 @@ model RefreshToken {
 
 // User Sessions
 model UserSession {
-  id           String   @id @default(cuid())
-  userId       String
-  deviceInfo   String?
-  ipAddress    String
-  userAgent    String?
-  isActive     Boolean  @default(true)
-  lastActivity DateTime @default(now())
-  createdAt    DateTime @default(now())
+  id              String    @id @default(cuid())
+  userId          String
+  sessionToken    String    @unique
+  tokenVersion    Int       @default(0)
+  deviceInfo      String?
+  ipAddress       String
+  userAgent       String?
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime
+  lastActivity    DateTime  @default(now())
+  lastRefreshedAt DateTime?
+  createdAt       DateTime  @default(now())
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([sessionToken])
+  @@index([userId, isActive])
+  @@index([tokenVersion])
   @@map("user_sessions")
 }
 
