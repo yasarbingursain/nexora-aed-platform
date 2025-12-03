@@ -159,11 +159,16 @@ export const getRedisCredentials = async (): Promise<{
   } catch (error) {
     // Fallback to environment variables
     logger.warn('Using Redis credentials from environment variables');
-    return {
+    const config: { host: string; port: number; password?: string } = {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
     };
+    
+    if (process.env.REDIS_PASSWORD) {
+      config.password = process.env.REDIS_PASSWORD;
+    }
+    
+    return config;
   }
 };
 

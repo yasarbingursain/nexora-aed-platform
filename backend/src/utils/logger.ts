@@ -1,6 +1,38 @@
 import winston from 'winston';
 import { env } from '@/config/env';
 
+/**
+ * SECURITY: Sanitize log messages to prevent log injection (CWE-117)
+ * Removes newlines, carriage returns, and control characters
+ */
+function sanitizeLogMessage(message: string): string {
+  if (typeof message !== 'string') return String(message);
+  return message
+    .replace(/[\r\n]/g, ' ')
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .substring(0, 1000); // Limit message length
+}
+
+/**
+ * SECURITY: Sanitize metadata to remove sensitive data
+ */
+function sanitizeMetadata(meta: any): any {
+  if (!meta || typeof meta !== 'object') return meta;
+  
+  const sensitiveKeys = ['password', 'token', 'secret', 'apiKey', 'authorization', 'cookie'];
+  const sanitized = { ...meta };
+  
+  for (const key of Object.keys(sanitized)) {
+    if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk))) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+      sanitized[key] = sanitizeMetadata(sanitized[key]);
+    }
+  }
+  
+  return sanitized;
+}
+
 // Define log format
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
@@ -10,8 +42,8 @@ const logFormat = winston.format.combine(
     return JSON.stringify({
       timestamp,
       level,
-      message,
-      ...meta,
+      message: sanitizeLogMessage(String(message)),
+      ...sanitizeMetadata(meta),
     });
   })
 );

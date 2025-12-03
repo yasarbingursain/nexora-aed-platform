@@ -36,11 +36,26 @@ export const createThreatSchema = z.object({
   severity: severitySchema,
   category: categorySchema,
   identityId: z.string().optional(),
-  sourceIp: z.string().ip().optional().or(z.literal('')),
-  indicators: z.array(z.string()).optional(),
-  evidence: z.record(z.string(), z.any()).optional(),
-  mitreTactics: z.array(z.string()).optional(),
-  mitreId: z.string().optional(),
+  sourceIp: z.string().ip().optional(),
+  indicators: z.array(
+    z.union([
+      z.string().ip(),
+      z.string().regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash'),
+      z.string().regex(/^[a-f0-9]{64}$/, 'Invalid SHA256 hash'),
+      z.string().regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid domain'),
+    ])
+  ).max(100, 'Too many indicators (max 100)').optional(),
+  evidence: z.object({
+    logs: z.array(z.string()).optional(),
+    screenshots: z.array(z.string().url()).optional(),
+    networkCapture: z.string().optional(),
+    fileHashes: z.array(z.string()).optional(),
+    timestamps: z.array(z.string().datetime()).optional(),
+  }).strict().optional(),
+  mitreTactics: z.array(z.string()).max(20).optional(),
+  mitreId: z.string()
+    .regex(/^T\d{4}(\.\d{3})?$/, 'Invalid MITRE ATT&CK ID format (e.g., T1078 or T1078.001)')
+    .optional(),
 });
 
 /**
@@ -53,11 +68,26 @@ export const updateThreatSchema = z.object({
   status: threatStatusSchema.optional(),
   category: categorySchema.optional(),
   assignedTo: z.string().email().optional(),
-  sourceIp: z.string().ip().optional().or(z.literal('')),
-  indicators: z.array(z.string()).optional(),
-  evidence: z.record(z.string(), z.any()).optional(),
-  mitreTactics: z.array(z.string()).optional(),
-  mitreId: z.string().optional(),
+  sourceIp: z.string().ip().optional(),
+  indicators: z.array(
+    z.union([
+      z.string().ip(),
+      z.string().regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash'),
+      z.string().regex(/^[a-f0-9]{64}$/, 'Invalid SHA256 hash'),
+      z.string().regex(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Invalid domain'),
+    ])
+  ).max(100, 'Too many indicators (max 100)').optional(),
+  evidence: z.object({
+    logs: z.array(z.string()).optional(),
+    screenshots: z.array(z.string().url()).optional(),
+    networkCapture: z.string().optional(),
+    fileHashes: z.array(z.string()).optional(),
+    timestamps: z.array(z.string().datetime()).optional(),
+  }).strict().optional(),
+  mitreTactics: z.array(z.string()).max(20).optional(),
+  mitreId: z.string()
+    .regex(/^T\d{4}(\.\d{3})?$/, 'Invalid MITRE ATT&CK ID format (e.g., T1078 or T1078.001)')
+    .optional(),
 });
 
 /**

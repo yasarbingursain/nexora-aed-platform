@@ -53,13 +53,34 @@ export const createIdentitySchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
   type: identityTypeSchema,
   provider: providerSchema,
-  externalId: z.string().optional(),
-  owner: z.string().email('Invalid email').optional(),
+  externalId: z.string()
+    .regex(/^[a-zA-Z0-9\-_:\/]+$/, 'Invalid external ID format')
+    .max(255, 'External ID too long')
+    .optional(),
+  owner: z.string()
+    .email('Invalid email')
+    .refine((email) => {
+      const disposableDomains = ['tempmail.com', 'guerrillamail.com', '10minutemail.com', 'throwaway.email'];
+      const domain = email.split('@')[1];
+      return !disposableDomains.includes(domain);
+    }, 'Disposable email addresses not allowed')
+    .optional(),
   description: z.string().max(1000, 'Description too long').optional(),
   tags: z.array(z.string()).optional(),
-  credentials: z.record(z.string(), z.any()).optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
-  rotationInterval: z.number().int().positive().optional(),
+  credentials: z.object({
+    type: z.enum(['password', 'api_key', 'certificate', 'ssh_key', 'token']),
+    value: z.string().min(1, 'Credential value required'),
+    encrypted: z.boolean().default(false),
+    expiresAt: z.string().datetime().optional(),
+  }).strict().optional(),
+  metadata: z.record(z.string(), z.any())
+    .refine((obj) => JSON.stringify(obj).length <= 10000, 'Metadata too large (max 10KB)')
+    .optional(),
+  rotationInterval: z.number()
+    .int()
+    .min(3600, 'Minimum rotation interval is 1 hour (3600 seconds)')
+    .max(31536000, 'Maximum rotation interval is 1 year')
+    .optional(),
 });
 
 /**

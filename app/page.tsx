@@ -24,18 +24,21 @@ const demoStats = {
 const features = [
   {
     icon: Shield,
-    title: "Zero Trust Architecture",
-    description: "Comprehensive protection for all non-human identities with deny-by-default policies and continuous verification."
+    title: "Always-On Protection",
+    description: "Every automated tool gets its own security checkpoint. Nothing gets through without permission - like a bouncer at an exclusive club, but for your software.",
+    technical: "Zero Trust Architecture with deny-by-default policies and continuous verification"
   },
   {
     icon: Zap,
-    title: "Autonomous Remediation",
-    description: "AI-powered threat response that automatically quarantines, rotates, and remediates security incidents in real-time."
+    title: "Self-Healing Security",
+    description: "When we spot a threat, we don't just alert you - we fix it automatically. Compromised password? We change it instantly. Suspicious behavior? We lock it down before damage happens.",
+    technical: "AI-powered autonomous remediation with automatic quarantine, rotation, and incident response"
   },
   {
     icon: Eye,
-    title: "Real-time Monitoring",
-    description: "24/7 behavioral analysis and anomaly detection across API keys, service accounts, and AI agents."
+    title: "24/7 Digital Bodyguard",
+    description: "We watch every move your bots and AI tools make. If something looks weird - like a bot suddenly accessing files it never touched before - we catch it immediately.",
+    technical: "Real-time behavioral analysis and anomaly detection across API keys, service accounts, and AI agents"
   }
 ];
 
@@ -106,19 +109,19 @@ export default function LandingPage() {
               </Badge>
               
               <h1 className="text-5xl lg:text-7xl font-display font-bold text-foreground mb-6 leading-[1.1]">
-                Defend What Your
+                Protect Your Digital Workers
                 <br />
                 <span className="bg-gradient-to-r from-nexora-primary via-nexora-quantum to-nexora-ai bg-clip-text text-transparent inline-block">
-                  Firewall Can&apos;t See
+                  Like You Protect People
                 </span>
               </h1>
               
               <p className="text-xl lg:text-2xl text-muted-foreground/80 mb-8 max-w-2xl leading-relaxed">
-                The first platform to secure AI agents, APIs, and autonomous entities before quantum breaks everything.
+                Your company runs on thousands of automated tools, bots, and AI assistants. We make sure they&apos;re safe.
               </p>
               
               <p className="text-base text-muted-foreground mb-10 max-w-xl">
-                Built for the autonomous era, not retrofitted. Enterprise-grade security that understands your non-human workforce.
+                Think of us as security guards for your software robots. We watch them 24/7, stop hackers from stealing their passwords, and automatically fix problems before they become disasters.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
@@ -202,21 +205,29 @@ export default function LandingPage() {
         <div className="container mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-foreground mb-4">
-              Enterprise-Grade Security Features
+              How Nexora Protects Your Business
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Built for modern cloud infrastructure with Zero Trust principles and autonomous threat response.
+              Simple, powerful security that works automatically - no PhD required.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="p-8 text-center hover:shadow-lg transition-shadow">
-                <div className="w-16 h-16 bg-gradient-to-r from-nexora-primary to-nexora-quantum rounded-full flex items-center justify-center mx-auto mb-6">
-                  <feature.icon className="h-8 w-8 text-white" />
+              <Card key={index} className="p-8 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group">
+                <div className="w-16 h-16 bg-gradient-to-r from-nexora-primary to-nexora-quantum rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                  <feature.icon className="h-8 w-8 text-white" aria-hidden="true" />
                 </div>
-                <h3 className="text-2xl font-semibold text-foreground mb-4">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+                <h3 className="text-2xl font-semibold text-foreground mb-4 text-center">{feature.title}</h3>
+                <p className="text-muted-foreground leading-relaxed mb-4 text-center">{feature.description}</p>
+                <details className="mt-4">
+                  <summary className="text-sm text-nexora-primary cursor-pointer hover:text-nexora-primary/80 text-center font-medium">
+                    Technical Details
+                  </summary>
+                  <p className="text-sm text-muted-foreground mt-2 pt-2 border-t border-border">
+                    {feature.technical}
+                  </p>
+                </details>
               </Card>
             ))}
           </div>

@@ -21,10 +21,11 @@ export class AuthController {
       });
 
       if (existingUser) {
-        return res.status(409).json({
+        res.status(409).json({
           error: 'User already exists',
           message: 'A user with this email already exists',
         });
+        return;
       }
 
       // Hash password
@@ -131,28 +132,31 @@ export class AuthController {
       });
 
       if (!user || !user.isActive) {
-        return res.status(401).json({
+        res.status(401).json({
           error: 'Authentication failed',
           message: 'Invalid credentials',
         });
+        return;
       }
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
-        return res.status(401).json({
+        res.status(401).json({
           error: 'Authentication failed',
           message: 'Invalid credentials',
         });
+        return;
       }
 
       // Check MFA if enabled
       if (user.mfaEnabled) {
         if (!mfaToken) {
-          return res.status(200).json({
+          res.status(200).json({
             requiresMfa: true,
             message: 'MFA token required',
           });
+          return;
         }
 
         const isValidMfa = speakeasy.totp.verify({
@@ -163,10 +167,11 @@ export class AuthController {
         });
 
         if (!isValidMfa) {
-          return res.status(401).json({
+          res.status(401).json({
             error: 'Authentication failed',
             message: 'Invalid MFA token',
           });
+          return;
         }
       }
 
@@ -262,10 +267,11 @@ export class AuthController {
       });
 
       if (!tokenRecord || !tokenRecord.user.isActive) {
-        return res.status(401).json({
+        res.status(401).json({
           error: 'Invalid refresh token',
           message: 'Refresh token is invalid or expired',
         });
+        return;
       }
 
       // Generate new access token
@@ -386,10 +392,11 @@ export class AuthController {
       });
 
       if (!userData?.mfaSecret) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'MFA not setup',
           message: 'MFA secret not found. Please setup MFA first.',
         });
+        return;
       }
 
       // Verify MFA token

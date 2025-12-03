@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Play, RotateCcw } from 'lucide-react';
+import { Play, RotateCcw, Pause, Gauge } from 'lucide-react';
 
 const scenarios = [
   {
@@ -125,10 +125,12 @@ export function TerminalDemo() {
   const [selectedScenario, setSelectedScenario] = useState(scenarios[0]);
   const [displayedLines, setDisplayedLines] = useState<typeof selectedScenario.steps>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1); // 1x, 0.5x, 2x
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || isPaused) return;
 
     const step = selectedScenario.steps[currentStep];
     if (!step) {
@@ -136,22 +138,31 @@ export function TerminalDemo() {
       return;
     }
 
+    // Apply playback speed to delay
+    const adjustedDelay = step.delay / playbackSpeed;
+
     const timer = setTimeout(() => {
       setDisplayedLines(prev => [...prev, step]);
       setCurrentStep(prev => prev + 1);
-    }, step.delay);
+    }, adjustedDelay);
 
     return () => clearTimeout(timer);
-  }, [isPlaying, currentStep, selectedScenario]);
+  }, [isPlaying, isPaused, currentStep, selectedScenario, playbackSpeed]);
 
   const handlePlay = () => {
     setDisplayedLines([]);
     setCurrentStep(0);
     setIsPlaying(true);
+    setIsPaused(false);
+  };
+
+  const handlePause = () => {
+    setIsPaused(!isPaused);
   };
 
   const handleReset = () => {
     setIsPlaying(false);
+    setIsPaused(false);
     setDisplayedLines([]);
     setCurrentStep(0);
   };
@@ -161,8 +172,53 @@ export function TerminalDemo() {
     handleReset();
   };
 
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+  };
+
+  // Keyboard navigation support - WCAG 2.1.1
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle if terminal is focused or no input is focused
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      switch(e.key) {
+        case ' ': // Spacebar to play/pause
+          e.preventDefault();
+          if (isPlaying) {
+            handlePause();
+          } else {
+            handlePlay();
+          }
+          break;
+        case 'r': // R to reset
+        case 'R':
+          e.preventDefault();
+          handleReset();
+          break;
+        case '1': // Number keys for speed
+          e.preventDefault();
+          handleSpeedChange(0.5);
+          break;
+        case '2':
+          e.preventDefault();
+          handleSpeedChange(1);
+          break;
+        case '3':
+          e.preventDefault();
+          handleSpeedChange(2);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isPlaying, isPaused]);
+
   return (
-    <section className="py-20 px-6 bg-bg-deep/30">
+    <section className="py-20 px-6 bg-bg-deep/30" role="region" aria-label="Interactive Terminal Demo">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
@@ -170,6 +226,11 @@ export function TerminalDemo() {
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Experience real-time threat detection and autonomous remediation. No login required.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Keyboard shortcuts: <kbd className="px-2 py-1 bg-card border rounded text-xs">Space</kbd> Play/Pause • 
+            <kbd className="px-2 py-1 bg-card border rounded text-xs ml-1">R</kbd> Reset • 
+            <kbd className="px-2 py-1 bg-card border rounded text-xs ml-1">1-3</kbd> Speed
           </p>
         </div>
 
@@ -201,23 +262,65 @@ export function TerminalDemo() {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {/* Playback Speed Controls - WCAG 2.2.2 Compliance */}
+              <div className="flex items-center gap-1 mr-2 border-r border-border pr-2">
+                <Gauge className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Button
+                  size="sm"
+                  variant={playbackSpeed === 0.5 ? 'default' : 'ghost'}
+                  onClick={() => handleSpeedChange(0.5)}
+                  className="h-7 px-2 text-xs"
+                  aria-label="Set playback speed to 0.5x (slower)"
+                >
+                  0.5x
+                </Button>
+                <Button
+                  size="sm"
+                  variant={playbackSpeed === 1 ? 'default' : 'ghost'}
+                  onClick={() => handleSpeedChange(1)}
+                  className="h-7 px-2 text-xs"
+                  aria-label="Set playback speed to 1x (normal)"
+                >
+                  1x
+                </Button>
+                <Button
+                  size="sm"
+                  variant={playbackSpeed === 2 ? 'default' : 'ghost'}
+                  onClick={() => handleSpeedChange(2)}
+                  className="h-7 px-2 text-xs"
+                  aria-label="Set playback speed to 2x (faster)"
+                >
+                  2x
+                </Button>
+              </div>
+              
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={handlePlay}
-                disabled={isPlaying}
+                onClick={isPlaying && !isPaused ? handlePause : handlePlay}
                 className="h-8"
+                aria-label={isPlaying && !isPaused ? 'Pause animation' : 'Play animation'}
               >
-                <Play className="h-4 w-4 mr-1" />
-                Run
+                {isPlaying && !isPaused ? (
+                  <>
+                    <Pause className="h-4 w-4 mr-1" aria-hidden="true" />
+                    Pause
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-1" aria-hidden="true" />
+                    {isPaused ? 'Resume' : 'Run'}
+                  </>
+                )}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleReset}
                 className="h-8"
+                aria-label="Reset animation"
               >
-                <RotateCcw className="h-4 w-4 mr-1" />
+                <RotateCcw className="h-4 w-4 mr-1" aria-hidden="true" />
                 Reset
               </Button>
             </div>

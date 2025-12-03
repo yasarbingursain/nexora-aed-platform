@@ -48,16 +48,17 @@ export class AdminController {
       const { id } = req.params;
       
       if (!id) {
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           error: 'Organization ID is required'
         });
+        return;
       }
       
       const organization = await organizationService.getOrganizationById(id);
       
       if (!organization) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: 'Organization not found'
         });
@@ -187,10 +188,11 @@ export class AdminController {
       const adminId = req.user?.userId;
 
       if (!adminId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Unauthorized'
         });
+        return;
       }
 
       await organizationService.suspendOrganization(id, reason);
@@ -224,10 +226,11 @@ export class AdminController {
       const adminId = req.user?.userId;
 
       if (!adminId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Unauthorized'
         });
+        return;
       }
 
       await organizationService.reactivateOrganization(id);
@@ -304,9 +307,9 @@ export class AdminController {
     }
   }
 
-  async getOrganizationBilling(req: Request, res: Response) {
+  async getOrganizationBilling(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = getRequiredParam(req, 'id');
       const billing = await billingService.getOrganizationBilling(id);
       res.json({
         success: true,
@@ -356,10 +359,11 @@ export class AdminController {
       const adminId = req.user?.userId;
 
       if (!adminId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Unauthorized'
         });
+        return;
       }
 
       await userService.suspendUser(id, reason);

@@ -7,12 +7,51 @@ import { iocTypeSchema } from '@/validators/intel.validator';
  * Zod schemas for malware sample analysis and IOC/threat queries.
  */
 
+/**
+ * SECURITY: SSRF protection for URL validation
+ * Blocks private IP ranges and cloud metadata endpoints
+ */
+const ssrfSafeUrlSchema = z.string().url().refine((url) => {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTP/HTTPS
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+    
+    // Block private IP ranges
+    const hostname = parsed.hostname.toLowerCase();
+    const privatePatterns = [
+      /^127\./,                    // 127.0.0.0/8
+      /^10\./,                     // 10.0.0.0/8
+      /^172\.(1[6-9]|2[0-9]|3[01])\./, // 172.16.0.0/12
+      /^192\.168\./,               // 192.168.0.0/16
+      /^169\.254\./,               // 169.254.0.0/16 (link-local)
+      /^0\./,                      // 0.0.0.0/8
+      /^localhost$/i,
+      /^metadata\.google\.internal$/i,
+      /^169\.254\.169\.254$/,      // AWS/Azure/GCP metadata
+    ];
+    
+    for (const pattern of privatePatterns) {
+      if (pattern.test(hostname)) {
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}, 'URL must be publicly accessible (private IPs and metadata endpoints blocked)');
+
 export const submitSampleSchema = z.object({
   type: z.enum(['file', 'url']),
-  url: z.string().url().optional(),
+  url: ssrfSafeUrlSchema.optional(),
   fileId: z.string().min(1, 'fileId is required for file submissions').optional(),
-  source: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  source: z.string().max(255).optional(),
+  tags: z.array(z.string()).max(20).optional(),
   priority: z.enum(['low', 'normal', 'high', 'critical']).default('normal'),
 }).superRefine((value, ctx) => {
   if (value.type === 'url' && !value.url) {

@@ -3,6 +3,25 @@ import { Request, Response } from 'express';
 import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
 
+/**
+ * SECURITY: Validate metric values to prevent DoS and data corruption
+ */
+function validateMetricValue(value: number, metricName: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    logger.warn('Invalid metric value detected', { metricName, value });
+    return 0;
+  }
+  
+  // Prevent extremely large values that could cause issues
+  const MAX_METRIC_VALUE = 1e15;
+  if (Math.abs(value) > MAX_METRIC_VALUE) {
+    logger.warn('Metric value exceeds maximum', { metricName, value });
+    return value > 0 ? MAX_METRIC_VALUE : -MAX_METRIC_VALUE;
+  }
+  
+  return value;
+}
+
 // Create a Registry which registers the metrics
 const register = new promClient.Registry();
 
@@ -158,7 +177,8 @@ export const updateBusinessMetrics = async () => {
     activeThreats.reset();
     
     threatCounts.forEach(({ severity, organizationId, _count }) => {
-      activeThreats.set({ severity, organization_id: organizationId }, _count);
+      const validatedCount = validateMetricValue(_count, 'activeThreats');
+      activeThreats.set({ severity, organization_id: organizationId }, validatedCount);
     });
 
     // Update identity metrics
@@ -171,11 +191,12 @@ export const updateBusinessMetrics = async () => {
     identitiesManaged.reset();
     
     identityCounts.forEach(({ type, status, organizationId, _count }) => {
+      const validatedCount = validateMetricValue(_count, 'identitiesManaged');
       identitiesManaged.set({ 
         type, 
         status, 
         organization_id: organizationId 
-      }, _count);
+      }, validatedCount);
     });
 
     logger.debug('Business metrics updated successfully');

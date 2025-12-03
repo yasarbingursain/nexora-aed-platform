@@ -1,35 +1,30 @@
 import Redis from 'ioredis';
 import { env } from './env';
 
+// Helper to create Redis options
+const createRedisOptions = () => {
+  const options: any = {
+    enableReadyCheck: false,
+    maxRetriesPerRequest: 3,
+    lazyConnect: true,
+    keepAlive: 30000,
+  };
+  
+  if (env.REDIS_PASSWORD) {
+    options.password = env.REDIS_PASSWORD;
+  }
+  
+  return options;
+};
+
 // Redis client for general use
-export const redis = new Redis(env.REDIS_URL, {
-  password: env.REDIS_PASSWORD,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
-  keepAlive: 30000,
-});
+export const redis = new Redis(env.REDIS_URL, createRedisOptions());
 
 // Redis client for BullMQ (separate connection)
-export const redisQueue = new Redis(env.REDIS_URL, {
-  password: env.REDIS_PASSWORD,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
-  keepAlive: 30000,
-});
+export const redisQueue = new Redis(env.REDIS_URL, createRedisOptions());
 
 // Redis client for rate limiting
-export const redisRateLimit = new Redis(env.REDIS_URL, {
-  password: env.REDIS_PASSWORD,
-  retryDelayOnFailover: 100,
-  enableReadyCheck: false,
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
-  keepAlive: 30000,
-});
+export const redisRateLimit = new Redis(env.REDIS_URL, createRedisOptions());
 
 // Connection event handlers
 redis.on('connect', () => {
