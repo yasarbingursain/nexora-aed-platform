@@ -1,52 +1,12 @@
 import { Request, Response } from 'express';
 import { logger } from '@/utils/logger';
+import { threatService } from '@/services/threats.service';
+import { prisma } from '@/config/database';
 
 /**
  * Customer Threat Controller
- * Handles customer-facing threat management operations
- * Using demo data for frontend integration
+ * PRODUCTION - Real database queries
  */
-
-// Demo threat data generator
-function generateDemoThreats(count: number, severity?: string) {
-  const threats = [];
-  const severities = ['critical', 'high', 'medium', 'low'];
-  const entityTypes = ['ai_agent', 'api_key', 'service_account', 'ssh_key'];
-  const statuses = ['active', 'investigating', 'resolved'];
-  
-  for (let i = 0; i < count; i++) {
-    const sev = severity || severities[Math.floor(Math.random() * severities.length)];
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    
-    threats.push({
-      id: `threat_${Date.now()}_${i}`,
-      severity: sev,
-      timestamp: new Date(Date.now() - Math.random() * 86400000),
-      entityName: `nhi:${entityTypes[Math.floor(Math.random() * entityTypes.length)]}:entity-${i}`,
-      entityType: entityTypes[Math.floor(Math.random() * entityTypes.length)],
-      riskScore: sev === 'critical' ? 0.85 + Math.random() * 0.15 :
-                 sev === 'high' ? 0.70 + Math.random() * 0.15 :
-                 sev === 'medium' ? 0.50 + Math.random() * 0.20 :
-                 0.20 + Math.random() * 0.30,
-      mlConfidence: 0.70 + Math.random() * 0.25,
-      reasons: [
-        'Scope drift detected',
-        'Geographic anomaly',
-        'Token lineage broken',
-      ].slice(0, Math.floor(Math.random() * 3) + 1),
-      mlBreakdown: {
-        graph: Math.random() * 0.5,
-        temporal: Math.random() * 0.3,
-        morphing: Math.random() * 0.25,
-        statistical: Math.random() * 0.15,
-      },
-      status,
-      details: 'Detailed threat information',
-    });
-  }
-  
-  return threats;
-}
 
 class CustomerThreatController {
   /**
@@ -55,6 +15,11 @@ class CustomerThreatController {
    */
   async list(req: Request, res: Response) {
     try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const {
         page = 1,
         limit = 10,
@@ -63,49 +28,36 @@ class CustomerThreatController {
         search,
       } = req.query;
 
-      const take = Number(limit);
-      
-      // Generate demo threats
-      let allThreats = generateDemoThreats(100);
-      
-      // Filter by severity
-      if (severity && severity !== 'all') {
-        allThreats = allThreats.filter(t => t.severity === severity);
-      }
-      
-      // Filter by status
-      if (status) {
-        allThreats = allThreats.filter(t => t.status === status);
-      }
-      
-      // Filter by search
-      if (search) {
-        const searchLower = (search as string).toLowerCase();
-        allThreats = allThreats.filter(t => 
-          t.entityName.toLowerCase().includes(searchLower) ||
-          (t.entityType && t.entityType.toLowerCase().includes(searchLower))
-        );
-      }
+      // Real database query
+      const result = await threatService.list(organizationId, {
+        page: Number(page),
+        limit: Number(limit),
+        severity: severity as string,
+        status: status as string,
+        search: search as string,
+      });
 
-      const total = allThreats.length;
-      const skip = (Number(page) - 1) * take;
-      const threats = allThreats.slice(skip, skip + take);
+      // Calculate real stats
+      const stats = await prisma.threat.groupBy({
+        by: ['severity', 'status'],
+        where: { organizationId },
+        _count: true,
+      });
 
-      // Calculate stats
-      const stats = {
-        critical: allThreats.filter(t => t.severity === 'critical' && t.status !== 'resolved').length,
-        high: allThreats.filter(t => t.severity === 'high' && t.status !== 'resolved').length,
-        medium: allThreats.filter(t => t.severity === 'medium' && t.status !== 'resolved').length,
-        low: allThreats.filter(t => t.severity === 'low' && t.status !== 'resolved').length,
-        resolved: allThreats.filter(t => t.status === 'resolved').length,
+      const statsMap = {
+        critical: stats.filter(s => s.severity === 'critical' && s.status !== 'resolved').reduce((sum, s) => sum + s._count, 0),
+        high: stats.filter(s => s.severity === 'high' && s.status !== 'resolved').reduce((sum, s) => sum + s._count, 0),
+        medium: stats.filter(s => s.severity === 'medium' && s.status !== 'resolved').reduce((sum, s) => sum + s._count, 0),
+        low: stats.filter(s => s.severity === 'low' && s.status !== 'resolved').reduce((sum, s) => sum + s._count, 0),
+        resolved: stats.filter(s => s.status === 'resolved').reduce((sum, s) => sum + s._count, 0),
       };
 
       res.json({
-        threats,
-        total,
-        page: Number(page),
-        totalPages: Math.ceil(total / take),
-        stats,
+        threats: result.data,
+        total: result.pagination.total,
+        page: result.pagination.page,
+        totalPages: result.pagination.totalPages,
+        stats: statsMap,
       });
     } catch (error) {
       logger.error('Error listing threats:', error);
@@ -119,9 +71,13 @@ class CustomerThreatController {
    */
   async getById(req: Request, res: Response) {
     try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const { id } = req.params;
-      const threats = generateDemoThreats(1);
-      const threat = { ...threats[0], id };
+      const threat = await threatService.getById(id, organizationId);
 
       res.json(threat);
     } catch (error) {
@@ -136,8 +92,16 @@ class CustomerThreatController {
    */
   async quarantine(req: Request, res: Response) {
     try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const { id } = req.params;
-      logger.info(`Threat ${id} quarantined`);
+      const { reason } = req.body;
+      
+      await threatService.quarantineThreat(id, organizationId, { reason });
+      
       res.json({ success: true, message: 'Threat quarantined successfully' });
     } catch (error) {
       logger.error('Error quarantining threat:', error);
@@ -151,8 +115,15 @@ class CustomerThreatController {
    */
   async rotateCredentials(req: Request, res: Response) {
     try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const { id } = req.params;
-      logger.info(`Credentials rotated for threat ${id}`);
+      
+      await threatService.rotateCredentials(id, organizationId);
+      
       res.json({ success: true, message: 'Credentials rotated successfully' });
     } catch (error) {
       logger.error('Error rotating credentials:', error);

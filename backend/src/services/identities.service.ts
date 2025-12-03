@@ -217,8 +217,41 @@ export class IdentityService {
       }
     );
 
-    // TODO: Integrate with cloud providers to actually rotate credentials
-    // This would call AWS/Azure/GCP APIs to rotate the actual credentials
+    // PRODUCTION: Real AWS credential rotation
+    const rotatedIdentity = await this.getById(id, organizationId);
+    
+    if (rotatedIdentity.type === 'api_key' && rotatedIdentity.metadata) {
+      try {
+        const { awsCredentialsService } = await import('@/services/cloud/aws-credentials.service');
+        
+        if (awsCredentialsService.isConfigured()) {
+          const metadata = rotatedIdentity.metadata as any;
+          const userName = metadata.awsUserName;
+          const oldKeyId = metadata.awsAccessKeyId;
+          
+          if (userName) {
+            const newCredentials = await awsCredentialsService.rotateAccessKey(userName, oldKeyId);
+            
+            // Update identity metadata with new credentials
+            await identityRepository.update(id, organizationId, {
+              metadata: {
+                ...metadata,
+                awsAccessKeyId: newCredentials.accessKeyId,
+                awsSecretAccessKey: newCredentials.secretAccessKey,
+                lastRotated: new Date().toISOString(),
+              },
+            });
+            
+            logger.info('AWS credentials rotated successfully', { id, organizationId, userName });
+          }
+        } else {
+          logger.warn('AWS credentials service not configured, rotation simulated', { id, organizationId });
+        }
+      } catch (error) {
+        logger.error('AWS credential rotation failed', { id, organizationId, error });
+        throw error;
+      }
+    }
 
     logger.info('Credentials rotated', { id, organizationId });
 
@@ -259,14 +292,74 @@ export class IdentityService {
       }
     );
 
+    // PRODUCTION: Real network quarantine
+    const quarantinedIdentity = await this.getById(id, organizationId);
+    
+    if (quarantinedIdentity.metadata) {
+      try {
+        const { awsQuarantineService } = await import('@/services/cloud/aws-quarantine.service');
+        
+        if (awsQuarantineService.isConfigured()) {
+          const metadata = quarantinedIdentity.metadata as any;
+          const ipAddress = metadata.lastSeenIP || metadata.sourceIP;
+          
+          if (ipAddress) {
+            await awsQuarantineService.quarantineIP(ipAddress, data.reason || 'Security threat detected');
+            logger.info('Network quarantine applied', { id, organizationId, ipAddress });
+          }
+        } else {
+          logger.warn('AWS quarantine service not configured, quarantine simulated', { id, organizationId });
+        }
+      } catch (error) {
+        logger.error('Network quarantine failed', { id, organizationId, error });
+        // Don't throw - DB quarantine still applied
+      }
+    }
+
     // TODO: Notify owner if requested
-    // TODO: Trigger automated remediation actions
 
     return {
       success: true,
       message: 'Identity quarantined successfully',
       identity: await this.getById(id, organizationId),
     };
+  }
+
+  /**
+   * Record activity and trigger ML analysis
+   */
+  async recordActivity(id: string, organizationId: string, activityType: string, metadata: any): Promise<void> {
+    // Record activity in database
+    await identityRepository.recordActivity(id, activityType, 'system', metadata);
+
+    // Trigger ML analysis asynchronously
+    setImmediate(async () => {
+      try {
+        const { mlIntegrationService } = await import('@/services/ml-integration.service');
+        const prediction = await mlIntegrationService.analyzeIdentityActivity(id, organizationId);
+        
+        if (prediction && prediction.is_anomaly && prediction.risk_level === 'critical') {
+          // Auto-create threat for critical anomalies
+          const { threatService } = await import('@/services/threats.service');
+          await threatService.create(organizationId, {
+            identityId: id,
+            severity: 'high',
+            description: `ML detected critical anomaly: ${prediction.contributing_factors.join(', ')}`,
+            category: 'anomalous_behavior',
+            status: 'active',
+            confidence: prediction.confidence,
+          });
+          
+          logger.warn('Critical ML anomaly detected, threat created', {
+            identityId: id,
+            organizationId,
+            riskLevel: prediction.risk_level,
+          });
+        }
+      } catch (error) {
+        logger.error('ML analysis failed during activity recording', { id, error });
+      }
+    });
   }
 
   /**

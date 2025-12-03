@@ -14,7 +14,8 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/utils/logger';
 import { THREAT_INTEL_SOURCES, INGESTION_CONFIG, ThreatIntelSource } from './sources.config';
-import { KafkaProducerService } from './kafka-producer.service';
+import { getEventBus } from '@/events/event-bus.factory';
+import { ThreatIntelEvent } from '@/events/threat-intel.types';
 import { z } from 'zod';
 import CircuitBreaker from 'opossum';
 import DOMPurify from 'isomorphic-dompurify';
@@ -65,11 +66,10 @@ const ThreatFoxResponseSchema = z.object({
 export class ThreatIntelIngestionService {
   private httpClients: Map<string, AxiosInstance> = new Map();
   private circuitBreakers: Map<string, CircuitBreaker> = new Map();
-  private kafkaProducer: KafkaProducerService;
+  private eventBus = getEventBus();
   private rateLimiters: Map<string, { count: number; resetAt: number }> = new Map();
 
   constructor() {
-    this.kafkaProducer = new KafkaProducerService();
     this.initializeHttpClients();
     this.initializeCircuitBreakers();
   }
@@ -242,13 +242,12 @@ export class ThreatIntelIngestionService {
         }))
       );
 
-      // Stream to Kafka for real-time processing
-      await this.kafkaProducer.publishThreatIntel({
+      // Stream to EventBus for real-time processing
+      await this.eventBus.publishThreatIntel({
         source: 'urlhaus',
         ioc_type: 'url',
         count: inserted,
         timestamp: new Date().toISOString(),
-        organization_id: 'global',
       });
 
       logger.info(`URLhaus: Ingested ${inserted} malicious URLs`);
@@ -305,7 +304,7 @@ export class ThreatIntelIngestionService {
         }))
       );
 
-      await this.kafkaProducer.publishThreatIntel({
+      await this.eventBus.publishThreatIntel({
         source: 'malwarebazaar',
         ioc_type: 'malware_sample',
         count: inserted,
@@ -364,12 +363,11 @@ export class ThreatIntelIngestionService {
         }))
       );
 
-      await this.kafkaProducer.publishThreatIntel({
+      await this.eventBus.publishThreatIntel({
         source: 'threatfox',
         ioc_type: 'mixed',
         count: inserted,
         timestamp: new Date().toISOString(),
-        organization_id: 'global',
       });
 
       logger.info(`ThreatFox: Ingested ${inserted} IOCs`);
@@ -433,10 +431,10 @@ export class ThreatIntelIngestionService {
     await prisma.ingestionFailure.create({
       data: {
         source,
-        error_message: error instanceof Error ? error.message : String(error),
-        error_stack: error instanceof Error ? error.stack : null,
-        retry_count: 0,
-        created_at: new Date(),
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? (error.stack || null) : null,
+        retryCount: 0,
+        createdAt: new Date(),
       },
     });
   }
@@ -466,5 +464,12 @@ export class ThreatIntelIngestionService {
       chunks.push(array.slice(i, i + size));
     }
     return chunks;
+  }
+
+  /**
+   * Shutdown service and cleanup
+   */
+  async shutdown(): Promise<void> {
+    await prisma.$disconnect();
   }
 }

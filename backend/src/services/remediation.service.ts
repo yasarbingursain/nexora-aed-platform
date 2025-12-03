@@ -195,23 +195,49 @@ export class RemediationService {
       threatId: data.threatId,
     });
 
-    // TODO (Sprint 2): Integrate with cloud provider APIs for real execution
-    // For now, return simulation result
+    // PRODUCTION: Real remediation execution
+    const { remediationExecutor } = await import('@/services/remediation/executor.service');
 
-    const actionResults = playbook.actions.map((action: any) => ({
+    const executionContext = {
+      organizationId,
+      identityId: data.identityId,
+      threatId: data.threatId,
+      playbookId: data.playbookId,
+      dryRun: data.dryRun !== false,
+    };
+
+    // Convert playbook actions to remediation actions
+    const actions = playbook.actions.map((action: any) => ({
       type: action.type,
       target: action.target,
-      status: 'simulated',
-      message: `Action ${action.type} would execute on ${action.target}`,
+      parameters: action.parameters || {},
+      cloudProvider: action.cloudProvider,
+      requiresApproval: action.requiresApproval,
+      blastRadius: action.blastRadius,
     }));
 
+    // Execute actions
+    const actionResults = await remediationExecutor.executeActions(actions, executionContext);
+
+    const allSuccessful = actionResults.every(r => r.success);
+    const executionMode = data.dryRun !== false ? 'dry-run' : 'production';
+
+    logger.info('Playbook execution completed', {
+      playbookId: data.playbookId,
+      organizationId,
+      executionMode,
+      totalActions: actionResults.length,
+      successful: actionResults.filter(r => r.success).length,
+      failed: actionResults.filter(r => !r.success).length,
+    });
+
     return {
-      success: true,
+      success: allSuccessful,
       playbook: {
         id: playbook.id,
         name: playbook.name,
       },
-      executionMode: data.dryRun !== false ? 'dry-run' : 'simulated',
+      executionMode,
       actionResults,
       timestamp: new Date().toISOString(),
     };

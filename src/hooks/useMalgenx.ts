@@ -5,7 +5,7 @@
 
 import { useState, useCallback } from 'react';
 
-const API_BASE = '/api/v1/malgenx';
+const API_BASE = 'http://localhost:8080/api/v1/malgenx';
 
 interface SubmitSampleRequest {
   type: 'file' | 'url';
@@ -221,7 +221,7 @@ export function useMalgenx() {
       if (params?.severity) queryParams.append('severity', params.severity);
       if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-      const response = await fetch(`${API_BASE}/threats/feed?${queryParams.toString()}`, {
+      const response = await fetch(`${API_BASE}/threats/feed/public?${queryParams.toString()}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

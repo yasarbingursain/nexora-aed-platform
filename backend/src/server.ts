@@ -35,6 +35,7 @@ import adminRoutes from '@/routes/admin.routes';
 import osintRoutes from '@/routes/osint.routes';
 import malgenxRoutes from '@/routes/malgenx.routes';
 import threatFeedRoutes from '@/routes/threat-feed.routes';
+import nhitiRoutes from '@/routes/nhiti.routes';
 
 // Create Express app
 const app = express();
@@ -121,6 +122,9 @@ app.use(`/api/${env.API_VERSION}/malgenx`, malgenxRoutes);
 
 // Real-Time Threat Feed routes
 app.use(`/api/${env.API_VERSION}/threat-feed`, threatFeedRoutes);
+
+// NHITI Threat Intelligence Sharing routes
+app.use(`/api/${env.API_VERSION}/nhiti`, nhitiRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);

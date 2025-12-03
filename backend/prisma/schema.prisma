@@ -621,3 +621,97 @@ model ThreatEvent {
 
   @@map("threat_events")
 }
+
+// NHITI (Non-Human Identity Threat Intelligence) Network
+// Standards: STIX 2.1, TAXII 2.1, GDPR Article 25
+model NhitiIndicator {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()"))
+  
+  // Privacy-Preserving Identifier
+  indicatorHash       String    @unique @map("indicator_hash")
+  
+  // STIX 2.1 Indicator Type
+  iocType             String    @map("ioc_type")
+  
+  // Threat Classification
+  threatCategory      String    @map("threat_category")
+  
+  // Risk Assessment
+  severity            String
+  confidence          Decimal   @db.Decimal(3, 2)
+  riskScore           Decimal   @default(0.0) @map("risk_score") @db.Decimal(5, 2)
+  
+  // K-Anonymity Tracking
+  contributingOrgs    String[]  @default([]) @map("contributing_orgs")
+  observationCount    Int       @default(1) @map("observation_count")
+  
+  // Differential Privacy
+  epsilon             Decimal   @default(0.1) @db.Decimal(5, 3)
+  noiseApplied        Boolean   @default(false) @map("noise_applied")
+  
+  // Temporal Data
+  firstSeen           DateTime  @default(now()) @map("first_seen")
+  lastSeen            DateTime  @default(now()) @map("last_seen")
+  ttlHours            Int       @default(168) @map("ttl_hours")
+  expiresAt           DateTime? @map("expires_at")
+  
+  // STIX 2.1 Extensions
+  stixId              String?   @map("stix_id")
+  stixVersion         String?   @default("2.1") @map("stix_version")
+  pattern             String?
+  patternType         String?   @default("stix") @map("pattern_type")
+  
+  // Metadata
+  metadata            Json      @default("{}")
+  
+  // Audit Trail
+  sharedAt            DateTime  @default(now()) @map("shared_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  
+  @@map("nhiti_indicators")
+}
+
+model NhitiParticipation {
+  id                        String   @id @default(dbgenerated("gen_random_uuid()"))
+  
+  // Anonymous Organization Identifier
+  orgHash                   String   @unique @map("org_hash")
+  
+  // Participation Metrics
+  indicatorsShared          Int      @default(0) @map("indicators_shared")
+  indicatorsConsumed        Int      @default(0) @map("indicators_consumed")
+  reputationScore           Decimal  @default(50.0) @map("reputation_score") @db.Decimal(5, 2)
+  
+  // Privacy Settings
+  kThreshold                Int      @default(5) @map("k_threshold")
+  epsilonBudget             Decimal  @default(0.1) @map("epsilon_budget") @db.Decimal(5, 3)
+  enableDifferentialPrivacy Boolean  @default(true) @map("enable_differential_privacy")
+  
+  // Temporal
+  joinedAt                  DateTime @default(now()) @map("joined_at")
+  lastActive                DateTime @default(now()) @map("last_active")
+  
+  @@map("nhiti_participation")
+}
+
+model NhitiQueryLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()"))
+  
+  // Requester (hashed for privacy)
+  requesterHash  String   @map("requester_hash")
+  
+  // Query Details
+  queryType      String   @map("query_type")
+  queryParams    Json     @default("{}") @map("query_params")
+  resultsCount   Int      @default(0) @map("results_count")
+  
+  // Rate Limiting & Abuse Detection
+  ipHash         String?  @map("ip_hash")
+  userAgentHash  String?  @map("user_agent_hash")
+  
+  // Temporal
+  queriedAt      DateTime @default(now()) @map("queried_at")
+  expiresAt      DateTime @default(dbgenerated("(NOW() + INTERVAL '90 days')")) @map("expires_at")
+  
+  @@map("nhiti_query_log")
+}

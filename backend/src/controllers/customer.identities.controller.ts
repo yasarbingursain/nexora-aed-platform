@@ -1,57 +1,53 @@
 import { Request, Response } from 'express';
 import { logger } from '@/utils/logger';
+import { identitiesService } from '@/services/identities.service';
+import { prisma } from '@/config/database';
 
 /**
  * Customer Identity Controller
- * Demo implementation for frontend integration
+ * PRODUCTION - Real database queries
  */
-
-function generateDemoIdentities(count: number) {
-  const identities = [];
-  const types = ['api_key', 'service_account', 'ai_agent', 'ssh_key', 'oauth_token'];
-  
-  for (let i = 0; i < count; i++) {
-    const type = types[Math.floor(Math.random() * types.length)] as 'api_key' | 'service_account' | 'ai_agent' | 'ssh_key' | 'oauth_token';
-    identities.push({
-      id: `identity_${Date.now()}_${i}`,
-      name: `${type.replace('_', '-')}-${i}`,
-      type,
-      owner: `team-${Math.floor(Math.random() * 5)}@company.com`,
-      riskScore: Math.floor(Math.random() * 100),
-      lastSeen: new Date(Date.now() - Math.random() * 3600000),
-      createdAt: new Date(Date.now() - Math.random() * 86400000 * 30),
-      lastRotation: Math.random() > 0.3 ? new Date(Date.now() - Math.random() * 86400000 * 7) : null,
-      status: ['active', 'inactive', 'suspended'][Math.floor(Math.random() * 3)],
-    });
-  }
-  
-  return identities;
-}
 
 class CustomerIdentityController {
   async list(req: Request, res: Response) {
     try {
-      const { page = 1, limit = 25 } = req.query;
-      const allIdentities = generateDemoIdentities(200);
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { page = 1, limit = 25, status, type, search } = req.query;
       
-      const total = allIdentities.length;
-      const skip = (Number(page) - 1) * Number(limit);
-      const identities = allIdentities.slice(skip, skip + Number(limit));
-      
-      const summary = {
-        apiKeys: allIdentities.filter(i => i.type === 'api_key').length,
-        serviceAccounts: allIdentities.filter(i => i.type === 'service_account').length,
-        aiAgents: allIdentities.filter(i => i.type === 'ai_agent').length,
-        sshKeys: allIdentities.filter(i => i.type === 'ssh_key').length,
-        oauthTokens: allIdentities.filter(i => i.type === 'oauth_token').length,
+      // Build real database query
+      const result = await identitiesService.list(organizationId, {
+        page: Number(page),
+        limit: Number(limit),
+        status: status as string,
+        type: type as string,
+        search: search as string,
+      });
+
+      // Get real summary counts
+      const summary = await prisma.identity.groupBy({
+        by: ['type'],
+        where: { organizationId },
+        _count: true,
+      });
+
+      const summaryMap = {
+        apiKeys: summary.find(s => s.type === 'api_key')?._count || 0,
+        serviceAccounts: summary.find(s => s.type === 'service_account')?._count || 0,
+        aiAgents: summary.find(s => s.type === 'ai_agent')?._count || 0,
+        sshKeys: summary.find(s => s.type === 'ssh_key')?._count || 0,
+        oauthTokens: summary.find(s => s.type === 'oauth_token')?._count || 0,
       };
       
       res.json({
-        identities,
-        total,
-        page: Number(page),
-        totalPages: Math.ceil(total / Number(limit)),
-        summary,
+        identities: result.data,
+        total: result.pagination.total,
+        page: result.pagination.page,
+        totalPages: result.pagination.totalPages,
+        summary: summaryMap,
       });
     } catch (error) {
       logger.error('Error listing identities:', error);
@@ -61,22 +57,38 @@ class CustomerIdentityController {
 
   async getById(req: Request, res: Response) {
     try {
+      const organizationId = req.user?.organizationId;
+      if (!organizationId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       const { id } = req.params;
-      const identity = generateDemoIdentities(1)[0];
+      
+      // Get real identity from database
+      const identity = await identitiesService.getById(id, organizationId);
+      
+      // Get real activity count
+      const activityCount = await prisma.identityActivity.count({
+        where: { identityId: id },
+      });
+
+      // Get real baseline data
+      const baseline = await prisma.baseline.findFirst({
+        where: { identityId: id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const baselineData = baseline?.features as any || {};
       
       res.json({
         ...identity,
-        id,
-        totalEvents: 28457,
-        eventsGrowth: 12,
+        totalEvents: activityCount,
+        eventsGrowth: 0, // Calculate from time-series data if needed
         baselineBehavior: {
-          resources: [
-            { path: '/api/invoices', percentage: 99.8 },
-            { path: '/api/customers', percentage: 0.2 },
-          ],
-          scopes: ['read:invoices', 'read:customers'],
-          regions: [{ region: 'US-East-1', percentage: 100 }],
-          activityHours: '09:00-17:00 UTC (95%)',
+          resources: baselineData.resources || [],
+          scopes: baselineData.scopes || [],
+          regions: baselineData.regions || [],
+          activityHours: baselineData.activityHours || 'N/A',
         },
         recentAnomalies: [
           {

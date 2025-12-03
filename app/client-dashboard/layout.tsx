@@ -1,8 +1,8 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Home, 
   Shield, 
@@ -30,6 +30,14 @@ export default function ClientDashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/auth/login');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,13 +75,61 @@ export default function ClientDashboardLayout({
           </nav>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-muted-foreground hover:text-foreground">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-            <button className="flex items-center gap-2 p-2 text-muted-foreground hover:text-foreground">
-              <User className="h-5 w-5" />
-            </button>
+            {/* Notifications */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+              
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg p-4 z-50">
+                  <h3 className="font-semibold mb-2">Notifications</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="p-2 hover:bg-muted rounded">
+                      <p className="font-medium">New threat detected</p>
+                      <p className="text-muted-foreground text-xs">2 minutes ago</p>
+                    </div>
+                    <div className="p-2 hover:bg-muted rounded">
+                      <p className="font-medium">OSINT ingestion complete</p>
+                      <p className="text-muted-foreground text-xs">5 minutes ago</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* User Menu */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 p-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <User className="h-5 w-5" />
+              </button>
+              
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg py-2 z-50">
+                  <Link 
+                    href="/client-dashboard/settings" 
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-muted transition-colors"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Link>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-muted transition-colors w-full text-left text-red-500"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

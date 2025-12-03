@@ -73,6 +73,7 @@ class MalwareIOC(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     sample_id = Column(UUID(as_uuid=True), nullable=False)
+    organization_id = Column(Text, nullable=False, server_default="'public'")
     
     # IOC Identity
     ioc_type = Column(Text, nullable=False)

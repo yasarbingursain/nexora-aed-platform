@@ -105,7 +105,7 @@ export default function LandingPage() {
             <div className="text-left">
               <Badge className="mb-6 bg-nexora-primary/10 text-nexora-primary border-nexora-primary/20 inline-flex items-center gap-2">
                 <div className="w-2 h-2 bg-nexora-primary rounded-full animate-pulse" />
-                Securing 45B+ Machine Identities • Quantum-Ready Since Day 1
+                Securing Machine Identities • Enterprise-Grade Protection
               </Badge>
               
               <h1 className="text-5xl lg:text-7xl font-display font-bold text-foreground mb-6 leading-[1.1]">

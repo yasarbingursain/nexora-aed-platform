@@ -50,6 +50,27 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#0ea5e9" />
         <meta name="color-scheme" content="dark light" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Suppress MetaMask and other browser extension errors
+              window.addEventListener('error', function(e) {
+                if (e.message && (e.message.includes('MetaMask') || e.message.includes('chrome-extension'))) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return false;
+                }
+              });
+              window.addEventListener('unhandledrejection', function(e) {
+                if (e.reason && e.reason.message && (e.reason.message.includes('MetaMask') || e.reason.message.includes('chrome-extension'))) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return false;
+                }
+              });
+            `,
+          }}
+        />
       </head>
       <body 
         className={cn(

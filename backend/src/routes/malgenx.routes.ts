@@ -23,6 +23,33 @@ import {
 
 const router = Router();
 
+// Public route for threats feed (demo purposes) - Proxies to MalGenX service
+router.get(
+  '/threats/feed/public',
+  validateQuery(threatsFeedQuerySchema),
+  async (req, res) => {
+    try {
+      const feedParams: any = { organizationId: 'public' };
+      if (req.query.sinceMinutes) feedParams.sinceMinutes = Number(req.query.sinceMinutes);
+      if (req.query.severity) feedParams.severity = req.query.severity;
+      if (req.query.limit) feedParams.limit = Number(req.query.limit);
+
+      const result = await malgenxProxyService.getThreatsFeed(feedParams);
+
+      return res.status(200).json(result);
+    } catch (error) {
+      logger.error('MalGenX public threats feed failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve threats feed',
+      });
+    }
+  }
+);
+
 router.use(requireAuth);
 router.use(tenantMiddleware);
 
