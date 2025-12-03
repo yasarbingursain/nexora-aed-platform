@@ -3,6 +3,10 @@ import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { env } from '@/config/env';
 import { logger } from '@/utils/logger';
+import { Kafka, Consumer } from 'kafkajs';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export interface SocketUser {
   userId: string;
@@ -220,4 +224,97 @@ export const emitAuditEvent = (io: SocketIOServer, organizationId: string, audit
     timestamp: new Date().toISOString(),
   });
   logger.debug('Audit event emitted', { organizationId, auditLogId: auditLog.id });
+};
+
+/**
+ * Initialize Kafka consumer for real-time threat feed
+ * CRITICAL: Maintains multi-tenant isolation
+ */
+export const initializeThreatFeed = async (io: SocketIOServer): Promise<Consumer | null> => {
+  // Only initialize if Kafka is configured
+  if (!process.env.KAFKA_BROKERS) {
+    logger.warn('Kafka not configured, threat feed disabled');
+    return null;
+  }
+
+  try {
+    const kafka = new Kafka({
+      clientId: 'nexora-websocket',
+      brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+      ssl: process.env.KAFKA_SSL === 'true',
+      sasl: process.env.KAFKA_USERNAME
+        ? {
+            mechanism: 'plain',
+            username: process.env.KAFKA_USERNAME,
+            password: process.env.KAFKA_PASSWORD!,
+          }
+        : undefined,
+    });
+
+    const consumer = kafka.consumer({ 
+      groupId: 'websocket-threat-feed',
+      sessionTimeout: 30000,
+    });
+
+    await consumer.connect();
+    await consumer.subscribe({ 
+      topics: ['threat-intel.ingested'],
+      fromBeginning: false,
+    });
+
+    await consumer.run({
+      eachMessage: async ({ topic, partition, message }) => {
+        try {
+          const threatEvent = JSON.parse(message.value!.toString());
+          
+          // CRITICAL: Maintain multi-tenant isolation
+          if (threatEvent.organization_id === 'global') {
+            // Global threats: Broadcast to all organizations
+            const orgs = await prisma.organization.findMany({ 
+              select: { id: true },
+              where: { status: 'ACTIVE' }
+            });
+            
+            orgs.forEach(org => {
+              io.to(`org:${org.id}:threats`).emit('threat:detected', {
+                id: message.key?.toString(),
+                source: threatEvent.source,
+                ioc_type: threatEvent.ioc_type,
+                count: threatEvent.count,
+                timestamp: threatEvent.timestamp,
+                global: true,
+              });
+            });
+            
+            logger.debug('Global threat broadcast', { 
+              source: threatEvent.source, 
+              orgCount: orgs.length 
+            });
+          } else {
+            // Organization-specific threat
+            io.to(`org:${threatEvent.organization_id}:threats`).emit('threat:detected', {
+              id: message.key?.toString(),
+              source: threatEvent.source,
+              ioc_type: threatEvent.ioc_type,
+              count: threatEvent.count,
+              timestamp: threatEvent.timestamp,
+              global: false,
+            });
+            
+            logger.debug('Org-specific threat emitted', { 
+              organizationId: threatEvent.organization_id 
+            });
+          }
+        } catch (error) {
+          logger.error('Failed to process threat event', { error });
+        }
+      },
+    });
+
+    logger.info('Threat feed WebSocket initialized');
+    return consumer;
+  } catch (error) {
+    logger.error('Failed to initialize threat feed', { error });
+    return null;
+  }
 };

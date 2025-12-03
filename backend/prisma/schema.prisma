@@ -451,3 +451,159 @@ model SecurityEvent {
 
   @@map("security_events")
 }
+
+// MalGenX Malware Samples
+model MalwareSample {
+  id                    String    @id @default(uuid())
+  organizationId        String    @map("organization_id")
+  submissionType        String    @map("submission_type")
+  fileHashSha256        String?   @map("file_hash_sha256")
+  fileHashMd5           String?   @map("file_hash_md5")
+  fileHashSha1          String?   @map("file_hash_sha1")
+  fileName              String?   @map("file_name")
+  fileSize              BigInt?   @map("file_size_bytes")
+  fileType              String?   @map("file_mime_type")
+  url                   String?
+  source                String?
+  tags                  String[]
+  priority              String    @default("normal")
+  submittedBy           String?   @map("submitted_by")
+  status                String    @default("queued")
+  analysisStartedAt     DateTime? @map("analysis_started_at")
+  analysisCompletedAt   DateTime? @map("analysis_completed_at")
+  analysisDurationMs    Int?      @map("analysis_duration_ms")
+  categoryUid           Int       @default(4) @map("category_uid")
+  categoryName          String    @default("Security Finding") @map("category_name")
+  classUid              Int       @default(4001) @map("class_uid")
+  className             String    @default("Malware Finding") @map("class_name")
+  typeUid               Int       @default(400101) @map("type_uid")
+  typeName              String    @default("Malware Sample Analysis") @map("type_name")
+  riskScore             Decimal?  @map("risk_score") @db.Decimal(5, 2)
+  riskLevel             String?   @map("risk_level")
+  confidenceScore       Decimal?  @map("confidence_score") @db.Decimal(3, 2)
+  malwareFamily         String?   @map("malware_family")
+  malwareCategory       String?   @map("malware_category")
+  isMalicious           Boolean?  @map("is_malicious")
+  falsePositive         Boolean   @default(false) @map("false_positive")
+  mitreTactics          String[]  @map("mitre_tactics")
+  mitreTechniques       String[]  @map("mitre_techniques")
+  storageLocation       String?   @map("storage_location")
+  retentionPolicy       String    @default("standard") @map("retention_policy")
+  expiresAt             DateTime? @map("expires_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  deletedAt             DateTime? @map("deleted_at")
+
+  iocs                  MalwareIoc[]
+
+  @@map("malware_samples")
+}
+
+// MalGenX Extracted IOCs
+model MalwareIoc {
+  id                    String    @id @default(uuid())
+  sampleId              String    @map("sample_id")
+  organizationId        String    @map("organization_id")
+  iocType               String    @map("ioc_type")
+  iocValue              String    @map("ioc_value")
+  extractionMethod      String    @map("extraction_method")
+  context               String?
+  isValidated           Boolean   @default(false) @map("is_validated")
+  validationMethod      String?   @map("validation_method")
+  threatIntelSources    String[]  @map("threat_intel_sources")
+  reputationScore       Decimal?  @map("reputation_score") @db.Decimal(3, 2)
+  isKnownMalicious      Boolean?  @map("is_known_malicious")
+  countryCode           String?   @map("country_code")
+  countryName           String?   @map("country_name")
+  asn                   String?
+  asnOrg                String?   @map("asn_org")
+  firstSeen             DateTime  @default(now()) @map("first_seen")
+  lastSeen              DateTime  @default(now()) @map("last_seen")
+  tags                  String[]
+  threatScore           Decimal?  @map("threat_score") @db.Decimal(3, 2)
+  firstSeenAt           DateTime  @default(now()) @map("first_seen_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  sample                MalwareSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+
+  @@unique([sampleId, iocType, iocValue], name: "unique_sample_ioc")
+  @@map("malware_iocs")
+}
+
+// Threat Intelligence Ingestion Failures
+model IngestionFailure {
+  id                    String   @id @default(uuid())
+  source                String
+  errorMessage          String   @map("error_message")
+  errorStack            String?  @map("error_stack")
+  retryCount            Int      @default(0) @map("retry_count")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@map("ingestion_failures")
+}
+
+// OSINT Threat Events (OCSF 1.1.0 Compliant - from migration 060)
+model ThreatEvent {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()"))
+  
+  // Core IOC Identity
+  externalId            String    @unique @map("external_id")
+  source                String
+  indicatorType         String    @map("indicator_type")
+  value                 String
+  
+  // OCSF Category/Class/Type
+  categoryUid           Int       @default(3) @map("category_uid")
+  categoryName          String    @default("Finding") @map("category_name")
+  classUid              Int       @default(3001) @map("class_uid")
+  className             String    @default("Threat Finding") @map("class_name")
+  typeUid               Int       @default(300101) @map("type_uid")
+  typeName              String    @default("OSINT Threat Finding") @map("type_name")
+  
+  // OCSF Activity & Status
+  activityId            Int       @default(1) @map("activity_id")
+  activityName          String    @default("Detected") @map("activity_name")
+  severityId            Int       @map("severity_id")
+  severity              String
+  statusId              Int       @default(1) @map("status_id")
+  status                String    @default("New")
+  
+  // Risk Assessment
+  riskScore             Decimal   @map("risk_score") @db.Decimal(5, 2)
+  riskLabel             String    @map("risk_label")
+  confidence            Decimal?  @db.Decimal(3, 2)
+  
+  // Threat Details
+  description           String?
+  sightings             Int       @default(1)
+  tags                  String[]
+  
+  // Geolocation
+  countryCode           String?   @map("country_code")
+  countryName           String?   @map("country_name")
+  city                  String?
+  latitude              Float?
+  longitude             Float?
+  
+  // Temporal Data
+  firstSeen             DateTime  @map("first_seen")
+  lastSeen              DateTime  @map("last_seen")
+  expiresAt             DateTime? @map("expires_at")
+  
+  // OCSF Entity Fields (JSONB)
+  actor                 Json?
+  resource              Json?
+  metadata              Json?
+  findingInfo           Json?     @map("finding_info")
+  observables           Json?
+  
+  // Multi-tenancy
+  organizationId        String?   @map("organization_id")
+  
+  // Audit Fields
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("threat_events")
+}

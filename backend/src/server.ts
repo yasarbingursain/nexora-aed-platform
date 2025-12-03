@@ -10,10 +10,11 @@ import { redis } from '@/config/redis';
 import { globalRateLimit } from '@/middleware/rateLimiter.middleware';
 import { applySecurity } from '@/middleware/security.middleware';
 import { auditMiddleware } from '@/middleware/audit.middleware';
-import { setupWebSocket } from '@/services/websocket.service';
+import { setupWebSocket, initializeThreatFeed } from '@/services/websocket.service';
 import { logger } from '@/utils/logger';
 import { metricsHandler, metricsMiddleware, startMetricsCollection } from '@/utils/metrics';
 import { createOrchestratorFromEnv } from '@/services/osint/orchestrator.service';
+import { ThreatIntelScheduler } from '@/jobs/threat-intel-scheduler';
 
 // Import routes
 import authRoutes from '@/routes/auth.routes';
@@ -32,6 +33,7 @@ import customerAnalyticsRoutes from '@/routes/customer.analytics.routes';
 import adminRoutes from '@/routes/admin.routes';
 import osintRoutes from '@/routes/osint.routes';
 import malgenxRoutes from '@/routes/malgenx.routes';
+import threatFeedRoutes from '@/routes/threat-feed.routes';
 
 // Create Express app
 const app = express();
@@ -112,6 +114,9 @@ app.use(`/api/${env.API_VERSION}/osint`, osintRoutes);
 
 // MalGenX Malware Analysis & Threat Intelligence routes
 app.use(`/api/${env.API_VERSION}/malgenx`, malgenxRoutes);
+
+// Real-Time Threat Feed routes
+app.use(`/api/${env.API_VERSION}/threat-feed`, threatFeedRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);
@@ -217,6 +222,22 @@ const gracefulShutdown = async (signal: string) => {
     logger.info('OSINT Orchestrator stopped');
   }
   
+  // Stop Threat Intel Scheduler
+  if (threatIntelScheduler) {
+    threatIntelScheduler.stop();
+    logger.info('Threat Intelligence Scheduler stopped');
+  }
+  
+  // Disconnect Kafka consumer
+  if (kafkaConsumer) {
+    try {
+      await kafkaConsumer.disconnect();
+      logger.info('Kafka consumer disconnected');
+    } catch (error) {
+      logger.error('Error disconnecting Kafka consumer:', error);
+    }
+  }
+  
   process.exit(0);
 };
 
@@ -250,6 +271,33 @@ if (process.env.ENABLE_OSINT_INGESTION === 'true') {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
+}
+
+// Initialize Threat Intelligence Scheduler
+let threatIntelScheduler: ThreatIntelScheduler | null = null;
+if (process.env.THREAT_INTEL_ENABLED === 'true') {
+  try {
+    threatIntelScheduler = new ThreatIntelScheduler();
+    threatIntelScheduler.start();
+    logger.info('✅ Threat Intelligence Scheduler started');
+  } catch (error) {
+    logger.error('Failed to start Threat Intelligence Scheduler', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+// Initialize Kafka Threat Feed for WebSocket
+let kafkaConsumer: Awaited<ReturnType<typeof initializeThreatFeed>> | null = null;
+if (env.ENABLE_WEBSOCKETS && process.env.KAFKA_BROKERS) {
+  initializeThreatFeed(io).then(consumer => {
+    kafkaConsumer = consumer;
+    if (consumer) {
+      logger.info('✅ Kafka threat feed initialized');
+    }
+  }).catch(error => {
+    logger.error('Failed to initialize Kafka threat feed', { error });
+  });
 }
 
 // Start server
