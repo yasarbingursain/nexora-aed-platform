@@ -26,6 +26,9 @@ export const redisQueue = new Redis(env.REDIS_URL, createRedisOptions());
 // Redis client for rate limiting
 export const redisRateLimit = new Redis(env.REDIS_URL, createRedisOptions());
 
+// Redis client for caching (separate connection)
+export const redisCache = new Redis(env.REDIS_URL, createRedisOptions());
+
 // Connection event handlers
 redis.on('connect', () => {
   console.log('✅ Redis connected');

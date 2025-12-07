@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { logger } from '@/utils/logger';
-import { identitiesService } from '@/services/identities.service';
+import { identityService } from '@/services/identities.service';
 import { prisma } from '@/config/database';
 
 /**
@@ -19,11 +19,12 @@ class CustomerIdentityController {
       const { page = 1, limit = 25, status, type, search } = req.query;
       
       // Build real database query
-      const result = await identitiesService.list(organizationId, {
+      const result = await identityService.list(organizationId, {
         page: Number(page),
         limit: Number(limit),
-        status: status as string,
-        type: type as string,
+        sortOrder: 'desc' as const,
+        status: status as any,
+        type: type as any,
         search: search as string,
       });
 
@@ -65,7 +66,7 @@ class CustomerIdentityController {
       const { id } = req.params;
       
       // Get real identity from database
-      const identity = await identitiesService.getById(id, organizationId);
+      const identity = await identityService.getById(id, organizationId);
       
       // Get real activity count
       const activityCount = await prisma.identityActivity.count({
@@ -75,10 +76,10 @@ class CustomerIdentityController {
       // Get real baseline data
       const baseline = await prisma.baseline.findFirst({
         where: { identityId: id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { lastUpdated: 'desc' },
       });
 
-      const baselineData = baseline?.features as any || {};
+      const baselineData = baseline ? JSON.parse(baseline.baselineData) : {};
       
       res.json({
         ...identity,

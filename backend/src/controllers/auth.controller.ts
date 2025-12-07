@@ -8,10 +8,12 @@ import { prisma } from '@/config/database';
 import { env } from '@/config/env';
 import { AuthenticatedUser } from '@/middleware/auth.middleware';
 import { getClientIP, getUserAgent } from '@/utils/request-helpers';
+import { accountLockoutService } from '@/services/account-lockout.service';
+import { logger } from '@/utils/logger';
 
 export class AuthController {
   // Register new organization and first user
-  static async register(req: Request, res: Response): Promise<void> {
+  static async register(req: Request, res: Response): Promise<Response | void> {
     try {
       const { organizationName, email, password, fullName } = req.body;
 
@@ -89,9 +91,11 @@ export class AuthController {
       await prisma.userSession.create({
         data: {
           userId: result.user.id,
+          sessionToken: accessToken,
           ipAddress: getClientIP(req),
           userAgent: getUserAgent(req),
           deviceInfo: getUserAgent(req),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       });
 
@@ -121,9 +125,27 @@ export class AuthController {
   }
 
   // Login user
-  static async login(req: Request, res: Response): Promise<void> {
+  static async login(req: Request, res: Response): Promise<Response | void> {
     try {
       const { email, password, mfaToken } = req.body;
+      const clientIp = getClientIP(req);
+
+      // SECURITY: Check if account is locked (CWE-307)
+      const lockStatus = await accountLockoutService.isLocked(email, clientIp);
+      if (lockStatus.locked) {
+        logger.warn('Login attempt on locked account', {
+          email,
+          ip: clientIp,
+          lockoutUntil: lockStatus.lockoutUntil,
+        });
+
+        res.status(423).json({
+          error: 'Account locked',
+          message: lockStatus.reason,
+          lockedUntil: lockStatus.lockoutUntil,
+        });
+        return;
+      }
 
       // Find user with organization
       const user = await prisma.user.findUnique({
@@ -132,9 +154,13 @@ export class AuthController {
       });
 
       if (!user || !user.isActive) {
+        // SECURITY: Record failed attempt
+        await accountLockoutService.recordFailedAttempt(email, clientIp, 'user_not_found');
+        
         res.status(401).json({
           error: 'Authentication failed',
           message: 'Invalid credentials',
+          remainingAttempts: lockStatus.remainingAttempts ? lockStatus.remainingAttempts - 1 : undefined,
         });
         return;
       }
@@ -142,9 +168,13 @@ export class AuthController {
       // Verify password
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
+        // SECURITY: Record failed attempt
+        await accountLockoutService.recordFailedAttempt(email, clientIp, 'invalid_password');
+        
         res.status(401).json({
           error: 'Authentication failed',
           message: 'Invalid credentials',
+          remainingAttempts: lockStatus.remainingAttempts ? lockStatus.remainingAttempts - 1 : undefined,
         });
         return;
       }
@@ -167,13 +197,20 @@ export class AuthController {
         });
 
         if (!isValidMfa) {
+          // SECURITY: Record failed MFA attempt
+          await accountLockoutService.recordFailedAttempt(email, clientIp, 'invalid_mfa');
+          
           res.status(401).json({
             error: 'Authentication failed',
             message: 'Invalid MFA token',
+            remainingAttempts: lockStatus.remainingAttempts ? lockStatus.remainingAttempts - 1 : undefined,
           });
           return;
         }
       }
+
+      // SECURITY: Clear failed attempts on successful authentication
+      await accountLockoutService.clearFailedAttempts(email, clientIp);
 
       // Generate JWT tokens
       const accessToken = jwt.sign(
@@ -211,9 +248,11 @@ export class AuthController {
         prisma.userSession.create({
           data: {
             userId: user.id,
+            sessionToken: accessToken,
             ipAddress: getClientIP(req),
             userAgent: getUserAgent(req),
             deviceInfo: getUserAgent(req),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
           },
         }),
       ]);
@@ -245,7 +284,7 @@ export class AuthController {
   }
 
   // Refresh access token
-  static async refresh(req: Request, res: Response): Promise<void> {
+  static async refresh(req: Request, res: Response): Promise<Response | void> {
     try {
       const { refreshToken } = req.body;
 
@@ -306,7 +345,7 @@ export class AuthController {
   }
 
   // Logout user
-  static async logout(req: Request, res: Response): Promise<void> {
+  static async logout(req: Request, res: Response): Promise<Response | void> {
     try {
       const { refreshToken } = req.body;
       const user = req.user as AuthenticatedUser;
@@ -345,7 +384,7 @@ export class AuthController {
   }
 
   // Setup MFA
-  static async setupMfa(req: Request, res: Response): Promise<void> {
+  static async setupMfa(req: Request, res: Response): Promise<Response | void> {
     try {
       const user = req.user as AuthenticatedUser;
 
@@ -380,7 +419,7 @@ export class AuthController {
   }
 
   // Verify and enable MFA
-  static async verifyMfa(req: Request, res: Response): Promise<void> {
+  static async verifyMfa(req: Request, res: Response): Promise<Response | void> {
     try {
       const { token } = req.body;
       const user = req.user as AuthenticatedUser;
@@ -434,7 +473,7 @@ export class AuthController {
   }
 
   // Disable MFA
-  static async disableMfa(req: Request, res: Response): Promise<void> {
+  static async disableMfa(req: Request, res: Response): Promise<Response | void> {
     try {
       const user = req.user as AuthenticatedUser;
 
@@ -460,7 +499,7 @@ export class AuthController {
   }
 
   // Get current user profile
-  static async getProfile(req: Request, res: Response): Promise<void> {
+  static async getProfile(req: Request, res: Response): Promise<Response | void> {
     try {
       const user = req.user as AuthenticatedUser;
 

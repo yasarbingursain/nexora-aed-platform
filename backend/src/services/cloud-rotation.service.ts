@@ -125,9 +125,16 @@ export class CloudCredentialRotationService {
    */
   async rotateAzureSecret(identityId: string, clientId: string): Promise<RotationResult> {
     try {
-      // Dynamic import
-      const { SecretClient } = await import('@azure/keyvault-secrets');
-      const { DefaultAzureCredential } = await import('@azure/identity');
+      // Check if Azure packages are available
+      let SecretClient: any, DefaultAzureCredential: any;
+      try {
+        const azureKeyvault = await import('@azure/keyvault-secrets' as any);
+        const azureIdentity = await import('@azure/identity' as any);
+        SecretClient = (azureKeyvault as any).SecretClient;
+        DefaultAzureCredential = (azureIdentity as any).DefaultAzureCredential;
+      } catch (importError) {
+        throw new Error('Azure SDK not installed. Run: npm install @azure/keyvault-secrets @azure/identity');
+      }
 
       const vaultUrl = process.env.AZURE_KEY_VAULT_URL;
       if (!vaultUrl) {
@@ -196,8 +203,14 @@ export class CloudCredentialRotationService {
     serviceAccountEmail: string
   ): Promise<RotationResult> {
     try {
-      // Dynamic import
-      const { IAMCredentialsClient } = await import('@google-cloud/iam-credentials');
+      // Check if GCP packages are available
+      let IAMCredentialsClient: any;
+      try {
+        const gcpIam = await import('@google-cloud/iam-credentials' as any);
+        IAMCredentialsClient = (gcpIam as any).IAMCredentialsClient;
+      } catch (importError) {
+        throw new Error('GCP SDK not installed. Run: npm install @google-cloud/iam-credentials');
+      }
 
       const client = new IAMCredentialsClient();
       const name = `projects/-/serviceAccounts/${serviceAccountEmail}`;

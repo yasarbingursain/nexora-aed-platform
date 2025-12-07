@@ -2,6 +2,7 @@ import { threatRepository } from '@/repositories/threats.repository';
 import { logger } from '@/utils/logger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
+import { cacheService, CacheNamespaces, CacheTTL } from './cache.service';
 import type {
   CreateThreatInput,
   UpdateThreatInput,
@@ -136,9 +137,19 @@ export class ThreatService {
   }
 
   /**
-   * Get threat by ID
+   * Get threat by ID (with caching)
    */
   async getById(id: string, organizationId: string) {
+    // Try cache first
+    const cacheKey = `${organizationId}:${id}`;
+    const cached = await cacheService.get(cacheKey, CacheNamespaces.THREATS);
+    
+    if (cached) {
+      logger.debug('Threat retrieved from cache', { id, organizationId });
+      return cached;
+    }
+
+    // Cache miss - fetch from database
     const threat = await threatRepository.findById(id, organizationId);
 
     if (!threat) {
@@ -174,12 +185,20 @@ export class ThreatService {
 
     logger.info('Threat retrieved', { id, organizationId, title: threat.title });
 
-    return {
+    const result = {
       ...threat,
       indicators,
       evidence,
       mitreTactics: threat.mitreTactics ? threat.mitreTactics.split(',').filter(Boolean) : [],
     };
+
+    // Cache the result
+    await cacheService.set(cacheKey, result, {
+      ttl: CacheTTL.MEDIUM,
+      namespace: CacheNamespaces.THREATS,
+    });
+
+    return result;
   }
 
   /**
@@ -235,11 +254,14 @@ export class ThreatService {
   }
 
   /**
-   * Update threat
+   * Update threat (invalidate cache)
    */
   async update(id: string, organizationId: string, data: UpdateThreatInput) {
     // Verify threat exists
     await this.getById(id, organizationId);
+
+    // Invalidate cache
+    await cacheService.delete(`${organizationId}:${id}`, CacheNamespaces.THREATS);
 
     // Prepare update data
     const updateData: Prisma.ThreatUpdateInput = {
@@ -283,11 +305,14 @@ export class ThreatService {
   }
 
   /**
-   * Delete threat
+   * Delete threat (invalidate cache)
    */
   async delete(id: string, organizationId: string) {
     // Verify threat exists
     await this.getById(id, organizationId);
+
+    // Invalidate cache
+    await cacheService.delete(`${organizationId}:${id}`, CacheNamespaces.THREATS);
 
     await threatRepository.delete(id, organizationId);
 

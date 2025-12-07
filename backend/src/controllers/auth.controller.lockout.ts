@@ -22,7 +22,7 @@ export class AuthControllerWithLockout {
   /**
    * User login with account lockout protection (CWE-307 fix)
    */
-  static async login(req: Request, res: Response): Promise<void> {
+  static async login(req: Request, res: Response): Promise<Response | void> {
     try {
       const { email, password, mfaToken } = req.body;
 
@@ -136,9 +136,11 @@ export class AuthControllerWithLockout {
       await prisma.userSession.create({
         data: {
           userId: user.id,
+          sessionToken: accessToken,
           ipAddress: getClientIP(req),
           userAgent: getUserAgent(req),
           deviceInfo: getUserAgent(req),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
         },
       });
 
@@ -246,7 +248,7 @@ export class AuthControllerWithLockout {
   /**
    * Unlock account (admin only)
    */
-  static async unlockAccount(req: Request, res: Response): Promise<void> {
+  static async unlockAccount(req: Request, res: Response): Promise<Response | void> {
     try {
       const { userId } = req.params;
       

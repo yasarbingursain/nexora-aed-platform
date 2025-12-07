@@ -17,7 +17,11 @@ import { metricsHandler, metricsMiddleware, startMetricsCollection } from '@/uti
 import { createOrchestratorFromEnv } from '@/services/osint/orchestrator.service';
 import { ThreatIntelScheduler } from '@/jobs/threat-intel-scheduler';
 
-// Import routes
+// SPRINT 3 Middleware
+import { performanceMiddleware, healthCheckHandler } from '@/middleware/performance.middleware';
+import { compressionMiddleware } from '@/middleware/compression.middleware';
+
+// Routes
 import authRoutes from '@/routes/auth.routes';
 import identitiesRoutes from '@/routes/identities.routes';
 import threatsRoutes from '@/routes/threats.routes';
@@ -37,16 +41,30 @@ import malgenxRoutes from '@/routes/malgenx.routes';
 import threatFeedRoutes from '@/routes/threat-feed.routes';
 import nhitiRoutes from '@/routes/nhiti.routes';
 
-// Create Express app
-const app = express();
+// Sprint 3 routes
+import exportRoutes from '@/routes/v1/export.routes';
+import cacheRoutes from '@/routes/v1/cache.routes';
 
-// Create HTTP server
+// ----------------------------------------------------
+// FIX 1: DECLARE SHARED VARS BEFORE THEY ARE USED
+// ----------------------------------------------------
+
+let io: SocketIOServer | undefined = undefined;
+let osintOrchestrator: ReturnType<typeof createOrchestratorFromEnv> | null = null;
+let threatIntelScheduler: ThreatIntelScheduler | null = null;
+let kafkaConsumer: Awaited<ReturnType<typeof initializeThreatFeed>> | null = null;
+
+// ----------------------------------------------------
+// EXPRESS APP
+// ----------------------------------------------------
+
+const app = express();
 const httpServer = createServer(app);
 
 // Apply security middleware
 app.use(applySecurity);
 
-// CORS configuration
+// CORS
 app.use(cors({
   origin: env.ALLOWED_ORIGINS.split(','),
   credentials: true,
@@ -54,27 +72,37 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
 }));
 
-// Compression middleware
-app.use(compression());
+// Compression
+app.use(compressionMiddleware);
 
-// Body parsing middleware
+// Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Global rate limiting
+// Rate Limiting
 app.use(globalRateLimit);
 
-// Metrics middleware
+// Performance
+app.use(performanceMiddleware);
+
+// Metrics
 app.use(metricsMiddleware);
 
-// Audit logging middleware (logs all API calls)
+// Audit Logging
 app.use(auditMiddleware);
 
-// SPRINT 2: Row-Level Security enforcement
+// RLS Enforcement
 app.use(enforceRowLevelSecurity);
 
-// Request logging middleware
-app.use((req, res, next) => {
+// ----------------------------------------------------
+// FIX 2: TYPE THE LOGGING MIDDLEWARE PARAMS
+// ----------------------------------------------------
+
+app.use((
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
   logger.info('Request received', {
     method: req.method,
     url: req.url,
@@ -84,17 +112,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-    environment: env.NODE_ENV,
-  });
-});
+// Health
+app.get('/health', healthCheckHandler);
 
-// API routes
+// API Routes
 app.use(`/api/${env.API_VERSION}/auth`, authRoutes);
 app.use(`/api/${env.API_VERSION}/identities`, identitiesRoutes);
 app.use(`/api/${env.API_VERSION}/threats`, threatsRoutes);
@@ -106,55 +127,40 @@ app.use(`/api/${env.API_VERSION}/gdpr`, gdprRoutes);
 app.use(`/api/${env.API_VERSION}/intel`, intelRoutes);
 app.use(`/api/${env.API_VERSION}/demo`, demoRoutes);
 
-// Customer-facing routes
+// Customer Routes
 app.use(`/api/${env.API_VERSION}/customer/threats`, customerThreatsRoutes);
 app.use(`/api/${env.API_VERSION}/customer/identities`, customerIdentitiesRoutes);
 app.use(`/api/${env.API_VERSION}/customer/analytics`, customerAnalyticsRoutes);
 
-// Admin routes (CRITICAL - REQUIRED FOR ADMIN PANEL)
+// Admin
 app.use(`/api/${env.API_VERSION}/admin`, adminRoutes);
 
-// OSINT Threat Intelligence routes
+// OSINT + MalGenX
 app.use(`/api/${env.API_VERSION}/osint`, osintRoutes);
-
-// MalGenX Malware Analysis & Threat Intelligence routes
 app.use(`/api/${env.API_VERSION}/malgenx`, malgenxRoutes);
 
-// Real-Time Threat Feed routes
+// Threat Feed
 app.use(`/api/${env.API_VERSION}/threat-feed`, threatFeedRoutes);
 
-// NHITI Threat Intelligence Sharing routes
+// NHITI
 app.use(`/api/${env.API_VERSION}/nhiti`, nhitiRoutes);
+
+// Export / Cache
+app.use(`/api/${env.API_VERSION}/export`, exportRoutes);
+app.use(`/api/${env.API_VERSION}/admin/cache`, cacheRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);
 
-// API documentation endpoint
+// API docs
 app.get('/api/docs', (req, res) => {
   res.json({
     message: 'Nexora AED Platform API',
     version: env.API_VERSION,
-    documentation: 'https://docs.nexora.com/api',
-    endpoints: {
-      auth: `/api/${env.API_VERSION}/auth`,
-      identities: `/api/${env.API_VERSION}/identities`,
-      threats: `/api/${env.API_VERSION}/threats`,
-      remediation: `/api/${env.API_VERSION}/remediation`,
-      compliance: `/api/${env.API_VERSION}/compliance`,
-      evidence: `/api/${env.API_VERSION}/evidence`,
-      gdpr: `/api/${env.API_VERSION}/gdpr`,
-      intel: `/api/${env.API_VERSION}/intel`,
-      customer: {
-        threats: `/api/${env.API_VERSION}/customer/threats`,
-        identities: `/api/${env.API_VERSION}/customer/identities`,
-        analytics: `/api/${env.API_VERSION}/customer/analytics`,
-      },
-      metrics: '/metrics',
-    },
   });
 });
 
-// 404 handler
+// 404 Handler
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -163,8 +169,16 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+// ----------------------------------------------------
+// GLOBAL ERROR HANDLER
+// ----------------------------------------------------
+
+app.use((
+  err: any,
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
   logger.error('Unhandled error:', {
     error: err.message,
     stack: err.stack,
@@ -174,141 +188,136 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 
   const statusCode = err.statusCode || 500;
-  const message = env.NODE_ENV === 'production' 
-    ? 'Internal server error' 
-    : err.message;
 
   res.status(statusCode).json({
-    error: message,
+    error: env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
     timestamp: new Date().toISOString(),
-    ...(env.NODE_ENV !== 'production' && { stack: err.stack }),
+    ...(env.NODE_ENV !== 'production' ? { stack: err.stack } : {}),
   });
 });
 
-// Setup WebSocket if enabled
-let io: SocketIOServer | undefined;
-if (env.ENABLE_WEBSOCKETS) {
+// ----------------------------------------------------
+// WEBSOCKETS
+// ----------------------------------------------------
+
+if (env.ENABLE_WEBSOCKETS === 'true') {
   io = setupWebSocket(httpServer);
   logger.info('WebSocket server initialized');
 }
 
-// Graceful shutdown
-const gracefulShutdown = async (signal: string) => {
+// ----------------------------------------------------
+// GRACEFUL SHUTDOWN FIXED + TYPE SAFE
+// ----------------------------------------------------
+
+const gracefulShutdown = async (signal: string): Promise<void> => {
   logger.info(`Received ${signal}, starting graceful shutdown...`);
-  
-  // Close HTTP server
-  httpServer.close(() => {
-    logger.info('HTTP server closed');
-  });
-  
-  // Close WebSocket server
-  if (io) {
-    io.close(() => {
-      logger.info('WebSocket server closed');
-    });
-  }
-  
-  // Close database connections
+
+  httpServer.close(() => logger.info('HTTP server closed'));
+
+  if (io) io.close(() => logger.info('WebSocket server closed'));
+
   try {
     await prisma.$disconnect();
     logger.info('Database connection closed');
   } catch (error) {
-    logger.error('Error closing database connection:', error);
+    logger.error('Error closing DB:', error);
   }
-  
-  // Close Redis connections
+
   try {
     await redis.quit();
     logger.info('Redis connection closed');
   } catch (error) {
-    logger.error('Error closing Redis connection:', error);
+    logger.error('Error closing Redis:', error);
   }
-  
-  // Stop OSINT Orchestrator
+
   if (osintOrchestrator) {
     osintOrchestrator.stop();
     logger.info('OSINT Orchestrator stopped');
   }
-  
-  // Stop Threat Intel Scheduler
+
   if (threatIntelScheduler) {
     threatIntelScheduler.stop();
     logger.info('Threat Intelligence Scheduler stopped');
   }
-  
-  // Disconnect Kafka consumer
+
   if (kafkaConsumer) {
     try {
       await kafkaConsumer.disconnect();
       logger.info('Kafka consumer disconnected');
     } catch (error) {
-      logger.error('Error disconnecting Kafka consumer:', error);
+      logger.error('Kafka disconnect error:', error);
     }
   }
-  
+
   process.exit(0);
 };
 
-// Handle shutdown signals
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
+process.on(
+  'unhandledRejection',
+  (reason: unknown, promise: Promise<unknown>) => {
+    logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+  }
+);
 
-// Start metrics collection
+// ----------------------------------------------------
+// START METRICS
+// ----------------------------------------------------
 startMetricsCollection();
 
-// Initialize OSINT Orchestrator
-let osintOrchestrator: ReturnType<typeof createOrchestratorFromEnv> | null = null;
+// ----------------------------------------------------
+// OSINT ORCHESTRATOR
+// ----------------------------------------------------
+
 if (process.env.ENABLE_OSINT_INGESTION === 'true') {
   try {
     osintOrchestrator = createOrchestratorFromEnv();
     osintOrchestrator.start();
     logger.info('✅ OSINT Orchestrator started');
   } catch (error) {
-    logger.error('Failed to start OSINT Orchestrator', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    logger.error('Failed to start OSINT Orchestrator:', error);
   }
 }
 
-// Initialize Threat Intelligence Scheduler
-let threatIntelScheduler: ThreatIntelScheduler | null = null;
+// ----------------------------------------------------
+// THREAT INTEL SCHEDULER
+// ----------------------------------------------------
+
 if (process.env.THREAT_INTEL_ENABLED === 'true') {
   try {
     threatIntelScheduler = new ThreatIntelScheduler();
     threatIntelScheduler.start();
     logger.info('✅ Threat Intelligence Scheduler started');
   } catch (error) {
-    logger.error('Failed to start Threat Intelligence Scheduler', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    logger.error('Failed to start scheduler:', error);
   }
 }
 
-// Initialize Kafka Threat Feed for WebSocket
-let kafkaConsumer: Awaited<ReturnType<typeof initializeThreatFeed>> | null = null;
-if (env.ENABLE_WEBSOCKETS && process.env.KAFKA_BROKERS) {
-  initializeThreatFeed(io).then(consumer => {
-    kafkaConsumer = consumer;
-    if (consumer) {
-      logger.info('✅ Kafka threat feed initialized');
-    }
-  }).catch(error => {
-    logger.error('Failed to initialize Kafka threat feed', { error });
-  });
+// ----------------------------------------------------
+// KAFKA THREAT FEED
+// ----------------------------------------------------
+
+if (env.ENABLE_WEBSOCKETS === 'true' && process.env.KAFKA_BROKERS) {
+  initializeThreatFeed(io)
+    .then(consumer => {
+      kafkaConsumer = consumer;
+      if (consumer) logger.info('✅ Kafka threat feed initialized');
+    })
+    .catch(error => logger.error('Kafka init error:', error));
 }
 
-// Start server
+// ----------------------------------------------------
+// START SERVER
+// ----------------------------------------------------
+
 const PORT = env.PORT || 8080;
 
 httpServer.listen(PORT, async () => {
@@ -316,27 +325,22 @@ httpServer.listen(PORT, async () => {
     port: PORT,
     environment: env.NODE_ENV,
     version: env.API_VERSION,
-    websockets: env.ENABLE_WEBSOCKETS,
-    osintIngestion: process.env.ENABLE_OSINT_INGESTION === 'true',
   });
-  
-  // SPRINT 2: Verify Row-Level Security is enabled
+
   try {
     const rlsStatus = await verifyRLSEnabled();
     if (rlsStatus.enabled) {
       logger.info('✅ Row-Level Security verified', {
-        tablesProtected: rlsStatus.tables.length,
+        tables: rlsStatus.tables.length,
       });
     } else {
-      logger.error('⚠️ Row-Level Security verification failed', {
-        errors: rlsStatus.errors,
-      });
+      logger.error('⚠️ RLS verification failed', { errors: rlsStatus.errors });
     }
   } catch (error) {
     logger.error('Failed to verify RLS', { error });
   }
-  
-  logger.info(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
+
+  logger.info(`📚 API Docs: http://localhost:${PORT}/api/docs`);
   logger.info(`❤️ Health Check: http://localhost:${PORT}/health`);
   logger.info(`📊 Metrics: http://localhost:${PORT}/metrics`);
 });

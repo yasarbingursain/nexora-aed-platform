@@ -40,6 +40,7 @@ model Organization {
   actions           Action[]
   securityEvents    SecurityEvent[]
   adminActions      AdminAuditLog[]
+  evidenceLogs      EvidenceLog[]
 
   @@map("organizations")
 }
@@ -332,24 +333,51 @@ model ComplianceReport {
   @@map("compliance_reports")
 }
 
-// Audit Logs
+// Audit Logs - Enhanced for Compliance (SOC2, GDPR, HIPAA, ISO 27001)
 model AuditLog {
   id             String   @id @default(cuid())
+  
+  // Event Information
+  event          String   // Event name (e.g., "user_login", "data_export")
+  entityType     String   // Type of entity affected (e.g., "user", "threat", "identity")
+  entityId       String   // ID of affected entity
+  action         String   // Action performed (create, read, update, delete, execute, access, export)
+  
+  // Actor Information
   userId         String?
-  action         String   // API endpoint or action taken
-  resource       String?  // resource affected
-  ipAddress      String
+  organizationId String
+  
+  // Context Information
+  ipAddress      String?
   userAgent      String?
+  metadata       String?  // JSON string with additional context
+  
+  // Change Tracking
+  changes        String?  // JSON string with before/after values
+  
+  // Result Information
+  result         String?  // success, failure, partial
+  errorMessage   String?
+  
+  // Security Classification
+  severity       String   @default("medium") // low, medium, high, critical
+  
+  // Legacy fields for backward compatibility
+  resource       String?  // Deprecated - use entityType
   requestBody    String?
   responseStatus Int?
   duration       Int?     // milliseconds
-  organizationId String
+  
   timestamp      DateTime @default(now())
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
 
+  @@index([organizationId, timestamp])
+  @@index([userId, timestamp])
+  @@index([entityType, timestamp])
+  @@index([severity, timestamp])
   @@map("audit_logs")
 }
 
@@ -714,4 +742,41 @@ model NhitiQueryLog {
   expiresAt      DateTime @default(dbgenerated("(NOW() + INTERVAL '90 days')")) @map("expires_at")
   
   @@map("nhiti_query_log")
+}
+
+// Evidence Log - Tamper-proof audit trail with cryptographic hashing
+model EvidenceLog {
+  id               BigInt   @id @default(autoincrement())
+  
+  // Temporal
+  ts               DateTime @default(now())
+  
+  // Organization Context
+  organizationId   String   @map("organization_id")
+  
+  // Actor Information
+  actor            String   // User ID or system identifier
+  
+  // Action Details
+  action           String   // Action performed (e.g., "threat_created", "identity_modified")
+  resourceType     String   @map("resource_type") // Type of resource (e.g., "threat", "identity")
+  resourceId       String   @map("resource_id") // ID of the resource
+  
+  // Payload
+  payload          Json     // Full event data
+  
+  // Cryptographic Chain
+  prevHash         String?  @map("prev_hash") // Hash of previous record (blockchain-style)
+  rowHash          String   @map("row_hash") // Hash of current record
+  
+  // Retention
+  retentionUntil   DateTime @map("retention_until") // When this record can be deleted
+  
+  // Relations
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@index([organizationId, ts])
+  @@index([resourceType, resourceId])
+  @@index([actor])
+  @@map("evidence_log")
 }

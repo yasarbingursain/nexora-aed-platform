@@ -19,21 +19,41 @@ import type {
 
 // Playbook Action Schema - Strictly typed
 const PlaybookActionSchema = z.object({
-  type: z.enum(['rotate', 'quarantine', 'notify', 'block', 'isolate', 'escalate']),
+  type: z.enum([
+    'rotate_credentials',
+    'quarantine_identity',
+    'block_ip',
+    'revoke_token',
+    'disable_user',
+    'isolate_instance',
+    'snapshot_volume',
+    'modify_security_group',
+    'update_iam_policy',
+    'send_notification',
+    'create_ticket',
+    'trigger_webhook',
+  ]),
   target: z.string().min(1).max(255),
-  parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
-  timeout: z.number().int().positive().max(3600).optional(), // Max 1 hour
+  parameters: z.record(z.string(), z.any()).optional(),
+  cloudProvider: z.enum(['aws', 'azure', 'gcp', 'kubernetes']).nullable().optional(),
+  requiresApproval: z.boolean().optional(),
+  blastRadius: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  timeout: z.number().int().positive().max(3600).optional(),
   retryCount: z.number().int().min(0).max(5).optional(),
-}).strict(); // Reject unknown properties
+});
 
 const PlaybookActionsSchema = z.array(PlaybookActionSchema).min(1).max(20);
 
-// Playbook Trigger Schema - Strictly typed
+// Playbook Trigger Schema - Strictly typed (matches validator)
 const PlaybookTriggerSchema = z.object({
-  type: z.enum(['threat_severity', 'risk_level', 'time_based', 'manual']),
-  conditions: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
-  threshold: z.number().optional(),
-}).strict();
+  type: z.enum(['threat_detected', 'risk_threshold', 'schedule', 'manual']),
+  conditions: z.object({
+    severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+    riskLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+    threshold: z.number().optional(),
+  }).optional(),
+  schedule: z.string().optional(),
+});
 
 /**
  * Remediation Service

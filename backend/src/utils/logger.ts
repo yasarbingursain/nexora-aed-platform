@@ -2,6 +2,13 @@ import winston from 'winston';
 import { env } from '@/config/env';
 
 /**
+ * Extended Logger interface with security method
+ */
+interface ExtendedLogger extends winston.Logger {
+  security: (message: string, meta?: any) => void;
+}
+
+/**
  * SECURITY: Sanitize log messages to prevent log injection (CWE-117)
  * Removes newlines, carriage returns, and control characters
  */
@@ -49,7 +56,7 @@ const logFormat = winston.format.combine(
 );
 
 // Create logger instance
-export const logger = winston.createLogger({
+const baseLogger = winston.createLogger({
   level: env.LOG_LEVEL,
   format: logFormat,
   defaultMeta: {
@@ -86,7 +93,7 @@ export const logger = winston.createLogger({
 if (env.LOKI_URL) {
   try {
     const LokiTransport = require('winston-loki');
-    logger.add(new LokiTransport({
+    baseLogger.add(new LokiTransport({
       host: env.LOKI_URL,
       labels: { 
         app: 'nexora-api',
@@ -106,16 +113,20 @@ if (env.LOKI_URL) {
 
 // Handle uncaught exceptions and rejections
 if (env.NODE_ENV === 'production') {
-  logger.exceptions.handle(
+  baseLogger.exceptions.handle(
     new winston.transports.File({ filename: 'logs/exceptions.log' })
   );
   
-  logger.rejections.handle(
+  baseLogger.rejections.handle(
     new winston.transports.File({ filename: 'logs/rejections.log' })
   );
 }
 
-// SECURITY FIX: Add security logging method
-(logger as any).security = (message: string, meta?: any) => {
-  logger.warn(`[SECURITY] ${message}`, { ...meta, securityEvent: true });
+// SECURITY FIX: Add security logging method with proper typing
+const extendedLogger = baseLogger as ExtendedLogger;
+extendedLogger.security = (message: string, meta?: any) => {
+  baseLogger.warn(`[SECURITY] ${message}`, { ...meta, securityEvent: true });
 };
+
+// Export with proper type
+export const logger = extendedLogger;
