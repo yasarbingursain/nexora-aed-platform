@@ -40,6 +40,7 @@ import osintRoutes from '@/routes/osint.routes';
 import malgenxRoutes from '@/routes/malgenx.routes';
 import threatFeedRoutes from '@/routes/threat-feed.routes';
 import nhitiRoutes from '@/routes/nhiti.routes';
+import pqcRoutes from '@/routes/pqc.routes';
 
 // Sprint 3 routes
 import exportRoutes from '@/routes/v1/export.routes';
@@ -145,6 +146,9 @@ app.use(`/api/${env.API_VERSION}/threat-feed`, threatFeedRoutes);
 // NHITI
 app.use(`/api/${env.API_VERSION}/nhiti`, nhitiRoutes);
 
+// Post-Quantum Cryptography (PQC)
+app.use(`/api/${env.API_VERSION}/pqc`, pqcRoutes);
+
 // Export / Cache
 app.use(`/api/${env.API_VERSION}/export`, exportRoutes);
 app.use(`/api/${env.API_VERSION}/admin/cache`, cacheRoutes);
@@ -200,7 +204,7 @@ app.use((
 // WEBSOCKETS
 // ----------------------------------------------------
 
-if (env.ENABLE_WEBSOCKETS === 'true') {
+if (env.ENABLE_WEBSOCKETS) {
   io = setupWebSocket(httpServer);
   logger.info('WebSocket server initialized');
 }
@@ -305,7 +309,7 @@ if (process.env.THREAT_INTEL_ENABLED === 'true') {
 // KAFKA THREAT FEED
 // ----------------------------------------------------
 
-if (env.ENABLE_WEBSOCKETS === 'true' && process.env.KAFKA_BROKERS) {
+if (env.ENABLE_WEBSOCKETS && process.env.KAFKA_BROKERS && io) {
   initializeThreatFeed(io)
     .then(consumer => {
       kafkaConsumer = consumer;

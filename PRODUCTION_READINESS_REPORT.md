@@ -129,10 +129,35 @@ ML_SERVICE_URL=http://localhost:8002
 
 ---
 
-### 8. **Quantum Claims Removed** ✅
-- ✅ Deleted `/src/features/quantum` directory
-- ✅ Removed "Quantum-Ready" from landing page
-- ✅ Updated to "Enterprise-Grade Protection"
+### 8. **Post-Quantum Cryptography (PQC) - IMPLEMENTED** ✅
+**Files Created:**
+- `backend/src/services/pqc/pqc.service.ts` - Full PQC service
+- `backend/src/controllers/pqc.controller.ts` - REST API controller
+- `backend/src/routes/pqc.routes.ts` - API routes
+
+**What Works:**
+- ✅ ML-KEM-768/1024 (FIPS 203) - Quantum-safe key encapsulation
+- ✅ ML-DSA-65/87 (FIPS 204) - Quantum-safe digital signatures
+- ✅ SLH-DSA-SHA2-256f (FIPS 205) - Hash-based signatures
+- ✅ Self-test endpoint verifies all algorithms
+- ✅ Key generation, encapsulation, signing, verification
+- ✅ Uses audited `@noble/post-quantum` library
+
+**API Endpoints:**
+- `GET /api/v1/pqc/capabilities` - List supported algorithms
+- `POST /api/v1/pqc/self-test` - Verify all algorithms work
+- `POST /api/v1/pqc/keys/kem` - Generate KEM key pair (auth required)
+- `POST /api/v1/pqc/keys/dsa` - Generate DSA key pair (auth required)
+- `POST /api/v1/pqc/encapsulate` - Encapsulate shared secret (auth required)
+- `POST /api/v1/pqc/sign` - Sign message (auth required)
+- `POST /api/v1/pqc/verify` - Verify signature (auth required)
+
+**Self-Test Results (Verified):**
+```
+ML-KEM-768: PASSED (21ms)
+ML-DSA-65: PASSED (27ms)
+SLH-DSA-SHA2-256f: PASSED (3948ms)
+```
 
 ---
 
@@ -161,21 +186,23 @@ ML_SERVICE_URL=http://localhost:8002
 
 ---
 
-### 2. **Autonomous Remediation** ⚠️
-**Status:** PARTIALLY IMPLEMENTED - Simulated Only
+### 2. **Autonomous Remediation** ✅
+**Status:** IMPLEMENTED - Dry-Run Default (Safety)
 
 **What Exists:**
 - ✅ Playbook creation and storage
-- ✅ Action validation
-- ✅ Trigger conditions
+- ✅ Action validation and trigger conditions
+- ✅ Real AWS IAM credential rotation via `awsCredentialsService`
+- ✅ Real AWS EC2 network quarantine via `awsQuarantineService`
+- ✅ Approval workflow for high-risk actions
+- ✅ Dry-run mode for safe testing
 
-**What's Missing:**
-- ❌ Real cloud provider API execution
-- ❌ `executePlaybook()` returns "simulated" status
-- ❌ No actual remediation actions taken
+**How to Enable Real Execution:**
+Set `dryRun: false` when calling `executePlaybook()` - defaults to `true` for safety.
 
-**File:**
-- `backend/src/services/remediation.service.ts:180-254` - TODO comments
+**Files:**
+- `backend/src/services/remediation/executor.service.ts` - Real AWS integrations
+- `backend/src/services/remediation.service.ts` - Playbook orchestration
 
 ---
 

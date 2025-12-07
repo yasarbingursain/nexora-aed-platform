@@ -43,17 +43,17 @@ Protect non-human, autonomous actors (AI agents, APIs, service accounts) in the 
 - **Behavioral Baselines**: ML-powered anomaly detection with explainability
 - **Real-time Defense**: Autonomous quarantine, rotation, and deception tactics
 
-### 🔐 Quantum-Resilient Security
-- **Post-Quantum Cryptography**: NIST-approved algorithms (CRYSTALS-Kyber, Dilithium, SPHINCS+)
-- **Hybrid Cryptography**: Classical + PQC for seamless transition
-- **Q-Day Readiness**: Quantum attack simulation and assessment tools
-- **Future-Proof**: Seamless migration to quantum-safe keys
+### 🔐 Post-Quantum Cryptography (MVP)
+- **FIPS 203 (ML-KEM)**: Kyber key encapsulation for quantum-safe key exchange
+- **FIPS 204 (ML-DSA)**: Dilithium digital signatures for quantum-safe authentication
+- **FIPS 205 (SLH-DSA)**: SPHINCS+ hash-based signatures for long-term security
+- **Key Management**: Generate, store, and rotate PQC keys via API
 
-### 🌐 Non-Human Identity Threat Intelligence (NHITI)
-- **Crowd-Sourced Defense**: Global threat intelligence network for machine identities
-- **Real-time Sharing**: Malicious machine fingerprints and behavioral signatures
-- **Network Effect**: Every customer strengthens the entire ecosystem
-- **Anonymous Contribution**: Privacy-preserving threat data sharing
+### 🌐 Non-Human Identity Threat Intelligence (NHITI) (MVP)
+- **Privacy-Preserving Sharing**: K-anonymity and differential privacy for IOC sharing
+- **STIX 2.1 Compliant**: Industry-standard threat intelligence format
+- **Crowd-Sourced Defense**: Aggregate threat data across organizations
+- **Rate-Limited API**: Secure access with abuse detection
 
 ### 🎯 Explainable AI & Compliance
 - **XAI Engine**: Transparent explanations for every security decision
@@ -61,11 +61,12 @@ Protect non-human, autonomous actors (AI agents, APIs, service accounts) in the 
 - **Compliance Mapping**: NIST, PCI DSS, HIPAA, SOC 2, GDPR frameworks
 - **Regulatory Ready**: Built for enterprise and government compliance
 
-### ⚡ Autonomous Remediation
-- **Real-time Response**: Automated countermeasures beyond alerts
-- **Smart Actions**: Quarantine, rotation, deception, sandbox isolation
-- **Rollback Planning**: Safe remediation with automatic rollback
-- **Ethical Defense**: "Digital Geneva Protocol" - autonomous defense within rules
+### ⚡ Autonomous Remediation (MVP)
+- **AWS IAM Key Rotation**: Real credential rotation via AWS SDK
+- **Network Quarantine**: IP blocking via EC2 Security Groups
+- **Playbook Engine**: Define and execute remediation workflows
+- **Dry-Run Mode**: Test actions before production execution
+- **Approval Workflows**: Human-in-the-loop for high-risk actions
 
 ---
 
