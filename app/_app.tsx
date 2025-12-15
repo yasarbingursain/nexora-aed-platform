@@ -6,7 +6,7 @@
  */
 
 import type { AppProps } from 'next/app'
-import { reportWebVitals } from '@/app/analytics'
+import { reportWebVitals } from './analytics'
 
 export { reportWebVitals }
 

@@ -26,6 +26,11 @@ import { logger } from '@/utils/logger';
 import { prisma } from '@/config/database';
 import { awsCredentialsService } from '@/services/cloud/aws-credentials.service';
 import { awsQuarantineService } from '@/services/cloud/aws-quarantine.service';
+import { azureQuarantineService } from '@/services/cloud/azure-quarantine.service';
+import { gcpQuarantineService } from '@/services/cloud/gcp-quarantine.service';
+import { kubernetesIsolationService } from '@/services/cloud/kubernetes-isolation.service';
+import { ticketingService, slackService } from '@/services/integrations/ticketing.service';
+import { rollbackService } from '@/services/remediation/rollback.service';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -445,14 +450,112 @@ export class RemediationExecutor {
   }
 
   /**
-   * Isolate cloud instance (placeholder for future implementation)
+   * Isolate cloud instance or Kubernetes pod
    */
   private async executeIsolateInstance(
     action: RemediationAction,
     context: ExecutionContext
   ): Promise<ExecutionResult> {
-    // TODO: Implement EC2/Azure VM/GCP Compute isolation
-    throw new Error('Instance isolation not yet implemented');
+    const { instanceId, podName, namespace, reason } = action.parameters;
+    const provider = action.cloudProvider;
+
+    try {
+      // Kubernetes pod isolation
+      if (podName) {
+        const result = await kubernetesIsolationService.isolatePod(
+          podName,
+          namespace || 'default',
+          reason || 'Security isolation by Nexora'
+        );
+
+        if (result.success) {
+          // Register rollback
+          await rollbackService.registerRollback(
+            `isolate-${podName}`,
+            'isolate_pod',
+            podName,
+            { podName, policyName: result.policyName, namespace: namespace || 'default' }
+          );
+
+          return {
+            success: true,
+            actionType: action.type,
+            target: podName,
+            status: 'completed',
+            message: `Pod ${podName} isolated with network policy ${result.policyName}`,
+            details: result,
+            rollbackPossible: true,
+            rollbackData: result.rollbackData,
+            executionTime: 0,
+          };
+        }
+        throw new Error(result.error || 'Pod isolation failed');
+      }
+
+      // Azure VM isolation via NSG
+      if (provider === 'azure' && instanceId) {
+        const result = await azureQuarantineService.quarantineIP(
+          instanceId,
+          reason || 'Security isolation by Nexora'
+        );
+
+        if (result.success) {
+          await rollbackService.registerRollback(
+            `isolate-azure-${instanceId}`,
+            'azure_nsg_quarantine',
+            instanceId,
+            { ruleName: result.ruleName }
+          );
+
+          return {
+            success: true,
+            actionType: action.type,
+            target: instanceId,
+            status: 'completed',
+            message: `Azure instance ${instanceId} isolated via NSG rule ${result.ruleName}`,
+            details: result,
+            rollbackPossible: true,
+            rollbackData: { ruleName: result.ruleName },
+            executionTime: 0,
+          };
+        }
+        throw new Error(result.error || 'Azure isolation failed');
+      }
+
+      // GCP VM isolation via firewall
+      if (provider === 'gcp' && instanceId) {
+        const result = await gcpQuarantineService.quarantineIP(
+          instanceId,
+          reason || 'Security isolation by Nexora'
+        );
+
+        if (result.success) {
+          await rollbackService.registerRollback(
+            `isolate-gcp-${instanceId}`,
+            'gcp_firewall_quarantine',
+            instanceId,
+            { ruleName: result.ruleName }
+          );
+
+          return {
+            success: true,
+            actionType: action.type,
+            target: instanceId,
+            status: 'completed',
+            message: `GCP instance ${instanceId} isolated via firewall rule ${result.ruleName}`,
+            details: result,
+            rollbackPossible: true,
+            rollbackData: { ruleName: result.ruleName },
+            executionTime: 0,
+          };
+        }
+        throw new Error(result.error || 'GCP isolation failed');
+      }
+
+      throw new Error('Instance isolation requires podName or instanceId with cloud provider');
+    } catch (error) {
+      throw new Error(`Instance isolation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**
@@ -489,70 +592,101 @@ export class RemediationExecutor {
   }
 
   /**
-   * Send notification
+   * Send notification via Slack
    */
   private async executeSendNotification(
     action: RemediationAction,
     context: ExecutionContext
   ): Promise<ExecutionResult> {
     try {
-      const { recipient, message, channel } = action.parameters;
+      const { title, message, priority, channel } = action.parameters;
 
-      logger.info('Notification sent', {
-        recipient,
-        channel: channel || 'email',
-        organizationId: context.organizationId,
+      // Send via Slack
+      const result = await slackService.sendAlert({
+        title: title || 'Security Alert',
+        description: message,
+        priority: priority || 'medium',
+        category: 'security',
+        metadata: {
+          organizationId: context.organizationId,
+          identityId: context.identityId,
+          threatId: context.threatId,
+        },
       });
 
-      // TODO: Integrate with notification service (SendGrid, Twilio, Slack, etc.)
+      if (result.success) {
+        logger.info('Slack notification sent', {
+          title,
+          channel: channel || 'default',
+          organizationId: context.organizationId,
+        });
 
-      return {
-        success: true,
-        actionType: action.type,
-        target: action.target,
-        status: 'completed',
-        message: `Notification sent to ${recipient}`,
-        details: {
-          recipient,
-          channel: channel || 'email',
-          sentAt: new Date().toISOString(),
-        },
-        rollbackPossible: false,
-        executionTime: 0,
-      };
+        return {
+          success: true,
+          actionType: action.type,
+          target: action.target,
+          status: 'completed',
+          message: `Notification sent via Slack`,
+          details: {
+            channel: channel || 'default',
+            sentAt: new Date().toISOString(),
+          },
+          rollbackPossible: false,
+          executionTime: 0,
+        };
+      }
+
+      throw new Error(result.error || 'Slack notification failed');
     } catch (error) {
       throw new Error(`Notification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
-   * Create support ticket
+   * Create support ticket via ServiceNow or Jira
    */
   private async executeCreateTicket(
     action: RemediationAction,
     context: ExecutionContext
   ): Promise<ExecutionResult> {
     try {
-      const { title, description, priority } = action.parameters;
+      const { title, description, priority, category, assignee } = action.parameters;
 
-      logger.info('Support ticket created', {
+      // Create tickets in configured systems
+      const results = await ticketingService.createAndNotify({
+        title: title || 'Security Incident',
+        description: description || 'Auto-generated security incident ticket',
+        priority: priority || 'medium',
+        category: category || 'security',
+        assignee,
+        labels: ['nexora', 'auto-generated'],
+        metadata: {
+          organizationId: context.organizationId,
+          identityId: context.identityId,
+          threatId: context.threatId,
+        },
+      });
+
+      const successfulTickets = results.tickets.filter(t => t.success);
+
+      logger.info('Support tickets created', {
         title,
         priority: priority || 'medium',
         organizationId: context.organizationId,
+        ticketCount: successfulTickets.length,
       });
 
-      // TODO: Integrate with ticketing system (Jira, ServiceNow, etc.)
-
       return {
-        success: true,
+        success: successfulTickets.length > 0,
         actionType: action.type,
         target: action.target,
-        status: 'completed',
-        message: `Support ticket created: ${title}`,
+        status: successfulTickets.length > 0 ? 'completed' : 'failed',
+        message: successfulTickets.length > 0 
+          ? `Tickets created: ${successfulTickets.map(t => t.ticketId).join(', ')}`
+          : 'No tickets created',
         details: {
-          title,
-          description,
-          priority: priority || 'medium',
+          tickets: results.tickets,
+          notification: results.notification,
           createdAt: new Date().toISOString(),
         },
         rollbackPossible: false,

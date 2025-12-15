@@ -65,6 +65,13 @@ export class AWSQuarantineService {
   }
 
   /**
+   * Remove IP from quarantine (alias for unquarantineIP)
+   */
+  async removeQuarantine(ipAddress: string): Promise<void> {
+    return this.unquarantineIP(ipAddress);
+  }
+
+  /**
    * Remove IP from quarantine
    */
   async unquarantineIP(ipAddress: string): Promise<void> {

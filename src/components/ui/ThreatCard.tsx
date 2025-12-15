@@ -7,12 +7,14 @@ import type { Threat } from "@/types/api.types";
 
 export interface ThreatCardProps {
   id: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
   status: "active" | "investigating" | "resolved" | "dismissed";
   onInvestigate?: () => void;
   onRemediate?: () => void;
+  onQuarantine?: () => void;
+  onRotate?: () => void;
   onDismiss?: () => void;
   className?: string;
   // Optional fields for backward compatibility
@@ -119,7 +121,7 @@ export function ThreatCard({
         <div className="flex items-center gap-2">
           <span className="text-lg">{severityStyle.icon}</span>
           <div>
-            <h3 className="font-semibold text-sm leading-tight">{title}</h3>
+            <h3 className="font-semibold text-sm leading-tight">{title || "Threat"}</h3>
             <p className="text-xs text-muted-foreground mt-1">
               {entityType}: {entityName}
             </p>
@@ -151,7 +153,7 @@ export function ThreatCard({
 
       {/* Description */}
       <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-        {description}
+        {description || ''}
       </p>
 
       {/* Actions */}

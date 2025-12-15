@@ -40,7 +40,7 @@ import {
   Monitor
 } from 'lucide-react';
 import { fetchOrganizations } from '@/lib/api/organizations';
-import type { Organization } from '@/components/admin/OrganizationDetail.types';
+import type { Organization } from '@/lib/api/organizations';
 
 type ViewMode = 'dashboard' | 'nhiti' | 'billing' | 'organization';
 export default function CompanyAdminDashboard() {

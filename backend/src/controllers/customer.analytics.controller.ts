@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { logger } from '@/utils/logger';
+import { prisma } from '@/config/database';
 
 /**
  * Customer Analytics Controller
@@ -110,6 +111,67 @@ class CustomerAnalyticsController {
     } catch (error) {
       logger.error('Error getting trends:', error);
       res.status(500).json({ error: 'Failed to get trends' });
+    }
+  }
+
+  async getMLAnomalies(req: Request, res: Response) {
+    try {
+      const organizationId = (req as any).tenant?.organizationId || (req as any).user?.organizationId;
+
+      if (!organizationId) {
+        res.status(401).json({ error: 'No organization context' });
+        return;
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+
+      const observations = await prisma.observation.findMany({
+        where: {
+          organizationId,
+          observationType: 'anomaly',
+        },
+        orderBy: { timestamp: 'desc' },
+        take: limit,
+      });
+
+      const anomalies = observations.map((obs) => {
+        let parsed: any = {};
+        try {
+          parsed = obs.data ? JSON.parse(obs.data) : {};
+        } catch {
+          parsed = {};
+        }
+
+        const riskLevel = (parsed.risk_level || 'medium') as 'low' | 'medium' | 'high' | 'critical';
+        const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.5;
+        const contributingFactors = Array.isArray(parsed.contributing_factors)
+          ? parsed.contributing_factors
+          : [];
+        const modelVersion = typeof parsed.model_version === 'string' ? parsed.model_version : 'unknown';
+        const anomalyScore =
+          typeof obs.anomalyScore === 'number'
+            ? obs.anomalyScore
+            : typeof parsed.anomaly_score === 'number'
+              ? parsed.anomaly_score
+              : 0;
+
+        return {
+          id: obs.id,
+          identityId: obs.identityId,
+          organizationId: obs.organizationId,
+          riskLevel,
+          anomalyScore,
+          confidence,
+          contributingFactors,
+          modelVersion,
+          timestamp: obs.timestamp,
+        };
+      });
+
+      res.json({ anomalies });
+    } catch (error) {
+      logger.error('Error getting ML anomalies:', error);
+      res.status(500).json({ error: 'Failed to get ML anomalies' });
     }
   }
 }

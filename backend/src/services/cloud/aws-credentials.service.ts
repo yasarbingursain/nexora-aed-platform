@@ -94,6 +94,23 @@ export class AWSCredentialsService {
   }
 
   /**
+   * Delete a specific access key
+   */
+  async deleteAccessKey(userName: string, accessKeyId: string): Promise<void> {
+    try {
+      const deleteCommand = new DeleteAccessKeyCommand({
+        UserName: userName,
+        AccessKeyId: accessKeyId,
+      });
+      await this.iamClient.send(deleteCommand);
+      logger.info('AWS IAM key deleted', { userName, accessKeyId });
+    } catch (error) {
+      logger.error('Failed to delete AWS access key', { userName, accessKeyId, error });
+      throw new Error(`Failed to delete access key: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Validate AWS credentials are configured
    */
   isConfigured(): boolean {

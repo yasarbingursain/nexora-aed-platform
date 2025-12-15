@@ -2,6 +2,9 @@
 -- Standards: STIX 2.1, TAXII 2.1, GDPR Article 25 (Privacy by Design)
 -- Security: K-Anonymity, Differential Privacy, Zero-Knowledge Proofs
 
+-- Ensure pgcrypto is available for cryptographic hashing
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- NHITI Shared Indicators Table
 CREATE TABLE "nhiti_indicators" (
   "id" TEXT NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
@@ -145,7 +148,13 @@ CREATE POLICY "nhiti_k_anonymity_policy" ON "nhiti_indicators"
 CREATE POLICY "nhiti_participation_isolation" ON "nhiti_participation"
   FOR ALL
   USING (
-    "org_hash" = encode(digest(current_setting('app.current_organization_id', true), 'sha256'), 'hex')
+    "org_hash" = encode(
+      digest(
+        current_setting('app.current_organization_id', true)::bytea,
+        'sha256'::text
+      ),
+      'hex'
+    )
   );
 
 -- Comments for Documentation

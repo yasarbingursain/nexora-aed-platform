@@ -371,9 +371,9 @@ KAFKA_BROKERS=localhost:9092
 - ✅ Backend running without errors
 
 **What Still Needs Work:**
-- ❌ NHITI threat sharing (broken, needs DB schema)
-- ❌ Autonomous remediation (simulated, needs real execution)
-- ❌ ML models (code exists, not tested)
+- ⚠️ NHITI threat sharing (code complete, needs real multi-org testing)
+- ✅ Autonomous remediation (REAL AWS execution exists, dry-run default for safety)
+- ⚠️ ML models (code exists, needs ML service running on port 8002)
 - ❌ Comprehensive testing (none exists)
 - ❌ Production hardening (monitoring, HA, DR)
 

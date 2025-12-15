@@ -780,3 +780,130 @@ model EvidenceLog {
   @@index([actor])
   @@map("evidence_log")
 }
+
+// Identity Lineage - Track identity creation and modification history
+model IdentityLineage {
+  id               String   @id @default(cuid())
+  identityId       String   @map("identity_id")
+  parentIdentityId String?  @map("parent_identity_id")
+  relationship     String   // created_from, cloned_from, rotated_from, delegated_from
+  createdBy        String   @map("created_by")
+  purpose          String
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  @@index([identityId])
+  @@index([parentIdentityId])
+  @@map("identity_lineage")
+}
+
+// Honey Tokens - Deception technology for threat detection
+model HoneyToken {
+  id                  String    @id @default(cuid())
+  organizationId      String    @map("organization_id")
+  type                String    // api_key, aws_credential, database_credential, etc.
+  tokenHash           String    @unique @map("token_hash") // Hashed value for lookup
+  name                String
+  description         String?
+  deploymentLocation  String    @map("deployment_location")
+  status              String    @default("active") // active, triggered, expired, disabled
+  triggerCount        Int       @default(0) @map("trigger_count")
+  firstTriggeredAt    DateTime? @map("first_triggered_at")
+  lastTriggeredAt     DateTime? @map("last_triggered_at")
+  expiresAt           DateTime? @map("expires_at")
+  metadata            Json      @default("{}")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  
+  alerts              HoneyTokenAlert[]
+  
+  @@index([organizationId, status])
+  @@index([tokenHash])
+  @@map("honey_tokens")
+}
+
+// Honey Token Alerts - Track when honey tokens are triggered
+model HoneyTokenAlert {
+  id            String   @id @default(cuid())
+  tokenId       String   @map("token_id")
+  sourceIp      String   @map("source_ip")
+  userAgent     String?  @map("user_agent")
+  requestPath   String?  @map("request_path")
+  requestMethod String?  @map("request_method")
+  headers       Json     @default("{}")
+  severity      String   // low, medium, high, critical
+  metadata      Json     @default("{}")
+  triggeredAt   DateTime @default(now()) @map("triggered_at")
+  
+  token         HoneyToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  
+  @@index([tokenId])
+  @@index([sourceIp])
+  @@map("honey_token_alerts")
+}
+
+// Remediation Rollback - Track rollback data for remediation actions
+model RemediationRollback {
+  id           String    @id @default(cuid())
+  actionId     String    @map("action_id")
+  actionType   String    @map("action_type")
+  target       String
+  rollbackData Json      @map("rollback_data")
+  status       String    @default("pending") // pending, completed, failed, expired
+  expiresAt    DateTime  @map("expires_at")
+  executedAt   DateTime? @map("executed_at")
+  error        String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  
+  @@index([actionId])
+  @@index([status])
+  @@map("remediation_rollbacks")
+}
+
+// ML Predictions - Store ML model predictions for audit
+model MLPrediction {
+  id              String   @id @default(cuid())
+  identityId      String   @map("identity_id")
+  organizationId  String   @map("organization_id")
+  modelVersion    String   @map("model_version")
+  isAnomaly       Boolean  @map("is_anomaly")
+  anomalyScore    Float    @map("anomaly_score")
+  riskLevel       String   @map("risk_level")
+  confidence      Float
+  features        Json
+  contributingFactors String[] @map("contributing_factors")
+  explanation     Json?    // SHAP/LIME explanation data
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@index([identityId])
+  @@index([organizationId, createdAt])
+  @@index([isAnomaly])
+  @@map("ml_predictions")
+}
+
+// Forensic Timeline Events - Aggregated timeline for investigations
+model ForensicTimelineEvent {
+  id            String   @id @default(cuid())
+  organizationId String  @map("organization_id")
+  eventType     String   @map("event_type")
+  category      String   // identity, threat, compliance, remediation, system
+  severity      String
+  title         String
+  description   String
+  actorId       String   @map("actor_id")
+  actorType     String   @map("actor_type")
+  targetId      String   @map("target_id")
+  targetType    String   @map("target_type")
+  sourceSystem  String   @map("source_system")
+  evidenceHash  String?  @map("evidence_hash")
+  mitreMapping  Json?    @map("mitre_mapping")
+  metadata      Json     @default("{}")
+  timestamp     DateTime
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  @@index([organizationId, timestamp])
+  @@index([category])
+  @@index([actorId])
+  @@index([targetId])
+  @@map("forensic_timeline_events")
+}

@@ -89,8 +89,8 @@ export function useThreatDetail(id: string) {
 }
 
 export function useExportThreats() {
-  return useMutation({
-    mutationFn: (filters?: ThreatFilters) => api.threats.export(filters),
+  return useMutation<Blob, Error, ThreatFilters | undefined>({
+    mutationFn: (filters?: ThreatFilters) => api.threats.export(filters) as Promise<Blob>,
     onSuccess: (blob) => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

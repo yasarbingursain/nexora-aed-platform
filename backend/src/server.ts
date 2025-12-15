@@ -46,6 +46,9 @@ import pqcRoutes from '@/routes/pqc.routes';
 import exportRoutes from '@/routes/v1/export.routes';
 import cacheRoutes from '@/routes/v1/cache.routes';
 
+// SOC Routes
+import socRoutes from '@/routes/soc.routes';
+
 // ----------------------------------------------------
 // FIX 1: DECLARE SHARED VARS BEFORE THEY ARE USED
 // ----------------------------------------------------
@@ -152,6 +155,9 @@ app.use(`/api/${env.API_VERSION}/pqc`, pqcRoutes);
 // Export / Cache
 app.use(`/api/${env.API_VERSION}/export`, exportRoutes);
 app.use(`/api/${env.API_VERSION}/admin/cache`, cacheRoutes);
+
+// SOC (Security Operations Center)
+app.use(`/api/${env.API_VERSION}/soc`, socRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);

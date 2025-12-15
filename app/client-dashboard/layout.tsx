@@ -12,7 +12,12 @@ import {
   Settings,
   Bell,
   User,
-  LogOut
+  LogOut,
+  Link2,
+  Flame,
+  GitBranch,
+  Activity,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +27,11 @@ const navigation = [
   { name: 'Threats', href: '/client-dashboard/threats', icon: AlertTriangle },
   { name: 'Analytics', href: '/client-dashboard/reports', icon: BarChart3 },
   { name: 'Compliance', href: '/client-dashboard/compliance', icon: FileText },
+  { name: 'Integrations', href: '/client-dashboard/integrations', icon: Link2 },
+  { name: 'Honey Tokens', href: '/client-dashboard/honey-tokens', icon: Flame },
+  { name: 'Lineage', href: '/client-dashboard/lineage', icon: GitBranch },
+  { name: 'Forensics', href: '/client-dashboard/forensics', icon: Activity },
+  { name: 'ML Anomalies', href: '/client-dashboard/ml', icon: Brain },
 ];
 
 export default function ClientDashboardLayout({

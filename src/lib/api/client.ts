@@ -3,6 +3,8 @@
  * Centralized HTTP client for backend API communication
  */
 
+import secureApiClient from './secure-client';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
 export class APIClient {
@@ -91,3 +93,31 @@ export class APIClient {
 
 // Export singleton instance
 export const apiClient = new APIClient();
+
+// Facade used by legacy hooks (analytics, entities, threats)
+export const api = {
+  analytics: {
+    metrics: ({ from, to }: { from: Date; to: Date }) => {
+      // secureApiClient currently supports timeRange; map dates to a string range
+      const timeRange = '24h';
+      return secureApiClient.getAnalytics(timeRange as any);
+    },
+    dashboard: () => secureApiClient.getDashboardAnalytics(),
+  },
+  entities: {
+    list: (params?: { type?: string; risk_threshold?: number }) =>
+      secureApiClient.getEntities(params as any),
+    get: (id: string) => secureApiClient.getEntityById(id),
+    baseline: (id: string) => secureApiClient.getEntityById(id),
+    create: (data: any) => secureApiClient.createEntity(data),
+    update: (id: string, data: any) => secureApiClient.updateEntity(id, data),
+    delete: (id: string) => secureApiClient.deleteEntity(id),
+  },
+  threats: {
+    list: (filters?: any) => secureApiClient.getThreats(filters),
+    get: (id: string) => secureApiClient.getThreatById(id),
+    update: (id: string, data: any) => secureApiClient.updateThreat(id, data),
+    timeline: (id: string) => secureApiClient.getActionHistory(id),
+    export: (filters?: any) => secureApiClient.exportThreats(filters),
+  },
+};

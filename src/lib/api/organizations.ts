@@ -72,3 +72,33 @@ export async function updateOrganization(id: string, data: Partial<Organization>
 export async function deleteOrganization(id: string): Promise<void> {
   return apiClient.delete<void>(`/admin/organizations/${id}`);
 }
+
+/**
+ * Fetch detailed organization view for admin dashboard
+ */
+export async function fetchOrganizationDetail(id: string): Promise<any> {
+  const response = await apiClient.get<any>(`/admin/organizations/${id}`);
+  // AdminController wraps payload in { success, data }
+  return (response as any).data ?? response;
+}
+
+/**
+ * Update organization settings (security/compliance/notifications)
+ */
+export async function updateOrganizationSettings(id: string, settings: any): Promise<void> {
+  await apiClient.patch(`/admin/organizations/${id}`, { settings });
+}
+
+/**
+ * Suspend organization
+ */
+export async function suspendOrganization(id: string, reason: string): Promise<void> {
+  await apiClient.post(`/admin/organizations/${id}/suspend`, { reason });
+}
+
+/**
+ * Reactivate suspended organization
+ */
+export async function reactivateOrganization(id: string): Promise<void> {
+  await apiClient.post(`/admin/organizations/${id}/reactivate`, {});
+}

@@ -57,4 +57,13 @@ router.get(
   customerAnalyticsController.getTrends.bind(customerAnalyticsController)
 );
 
+/**
+ * GET /api/v1/customer/analytics/ml-anomalies
+ * Get recent ML anomalies derived from observations
+ */
+router.get(
+  '/ml-anomalies',
+  customerAnalyticsController.getMLAnomalies.bind(customerAnalyticsController)
+);
+
 export default router;

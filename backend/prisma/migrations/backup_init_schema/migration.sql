@@ -1,5 +1,7 @@
+-- Legacy backup init schema. Guarded with IF NOT EXISTS to avoid duplicate creation on modern schema.
+
 -- CreateTable
-CREATE TABLE "organizations" (
+CREATE TABLE IF NOT EXISTS "organizations" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "domain" TEXT,
@@ -14,7 +16,7 @@ CREATE TABLE "organizations" (
 );
 
 -- CreateTable
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
@@ -32,7 +34,7 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "refresh_tokens" (
+CREATE TABLE IF NOT EXISTS "refresh_tokens" (
     "id" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -43,7 +45,7 @@ CREATE TABLE "refresh_tokens" (
 );
 
 -- CreateTable
-CREATE TABLE "user_sessions" (
+CREATE TABLE IF NOT EXISTS "user_sessions" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "deviceInfo" TEXT,
@@ -57,7 +59,7 @@ CREATE TABLE "user_sessions" (
 );
 
 -- CreateTable
-CREATE TABLE "api_keys" (
+CREATE TABLE IF NOT EXISTS "api_keys" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "keyHash" TEXT NOT NULL,
@@ -72,7 +74,7 @@ CREATE TABLE "api_keys" (
 );
 
 -- CreateTable
-CREATE TABLE "identities" (
+CREATE TABLE IF NOT EXISTS "identities" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -96,7 +98,7 @@ CREATE TABLE "identities" (
 );
 
 -- CreateTable
-CREATE TABLE "identity_activities" (
+CREATE TABLE IF NOT EXISTS "identity_activities" (
     "id" TEXT NOT NULL,
     "identityId" TEXT NOT NULL,
     "activity" TEXT NOT NULL,
@@ -108,7 +110,7 @@ CREATE TABLE "identity_activities" (
 );
 
 -- CreateTable
-CREATE TABLE "baselines" (
+CREATE TABLE IF NOT EXISTS "baselines" (
     "id" TEXT NOT NULL,
     "identityId" TEXT NOT NULL,
     "behaviorType" TEXT NOT NULL,
@@ -121,7 +123,7 @@ CREATE TABLE "baselines" (
 );
 
 -- CreateTable
-CREATE TABLE "observations" (
+CREATE TABLE IF NOT EXISTS "observations" (
     "id" TEXT NOT NULL,
     "identityId" TEXT NOT NULL,
     "observationType" TEXT NOT NULL,
@@ -134,7 +136,7 @@ CREATE TABLE "observations" (
 );
 
 -- CreateTable
-CREATE TABLE "threats" (
+CREATE TABLE IF NOT EXISTS "threats" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
@@ -157,7 +159,7 @@ CREATE TABLE "threats" (
 );
 
 -- CreateTable
-CREATE TABLE "incidents" (
+CREATE TABLE IF NOT EXISTS "incidents" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
@@ -174,7 +176,7 @@ CREATE TABLE "incidents" (
 );
 
 -- CreateTable
-CREATE TABLE "actions" (
+CREATE TABLE IF NOT EXISTS "actions" (
     "id" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'pending',
@@ -193,7 +195,7 @@ CREATE TABLE "actions" (
 );
 
 -- CreateTable
-CREATE TABLE "playbooks" (
+CREATE TABLE IF NOT EXISTS "playbooks" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -208,7 +210,7 @@ CREATE TABLE "playbooks" (
 );
 
 -- CreateTable
-CREATE TABLE "compliance_reports" (
+CREATE TABLE IF NOT EXISTS "compliance_reports" (
     "id" TEXT NOT NULL,
     "framework" TEXT NOT NULL,
     "reportType" TEXT NOT NULL,
@@ -223,7 +225,7 @@ CREATE TABLE "compliance_reports" (
 );
 
 -- CreateTable
-CREATE TABLE "audit_logs" (
+CREATE TABLE IF NOT EXISTS "audit_logs" (
     "id" TEXT NOT NULL,
     "userId" TEXT,
     "action" TEXT NOT NULL,
@@ -240,7 +242,7 @@ CREATE TABLE "audit_logs" (
 );
 
 -- CreateTable
-CREATE TABLE "system_uptime_metrics" (
+CREATE TABLE IF NOT EXISTS "system_uptime_metrics" (
     "id" TEXT NOT NULL,
     "serviceName" TEXT NOT NULL,
     "status" TEXT NOT NULL,
@@ -253,7 +255,7 @@ CREATE TABLE "system_uptime_metrics" (
 );
 
 -- CreateTable
-CREATE TABLE "vendor_assessments" (
+CREATE TABLE IF NOT EXISTS "vendor_assessments" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "vendorName" TEXT NOT NULL,
@@ -283,7 +285,7 @@ CREATE TABLE "vendor_assessments" (
 );
 
 -- CreateTable
-CREATE TABLE "dora_ict_incidents" (
+CREATE TABLE IF NOT EXISTS "dora_ict_incidents" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "incidentType" TEXT NOT NULL,
@@ -310,97 +312,125 @@ CREATE TABLE "dora_ict_incidents" (
 );
 
 -- CreateTable
-CREATE TABLE "_IncidentToThreat" (
+CREATE TABLE IF NOT EXISTS "_IncidentToThreat" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "organizations_domain_key" ON "organizations"("domain");
+CREATE UNIQUE INDEX IF NOT EXISTS "organizations_domain_key" ON "organizations"("domain");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "refresh_tokens_token_key" ON "refresh_tokens"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "refresh_tokens_token_key" ON "refresh_tokens"("token");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "api_keys_keyHash_key" ON "api_keys"("keyHash");
+CREATE UNIQUE INDEX IF NOT EXISTS "api_keys_keyHash_key" ON "api_keys"("keyHash");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "vendor_assessments_organizationId_vendorName_key" ON "vendor_assessments"("organizationId", "vendorName");
+CREATE UNIQUE INDEX IF NOT EXISTS "vendor_assessments_organizationId_vendorName_key" ON "vendor_assessments"("organizationId", "vendorName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "_IncidentToThreat_AB_unique" ON "_IncidentToThreat"("A", "B");
+CREATE UNIQUE INDEX IF NOT EXISTS "_IncidentToThreat_AB_unique" ON "_IncidentToThreat"("A", "B");
 
 -- CreateIndex
-CREATE INDEX "_IncidentToThreat_B_index" ON "_IncidentToThreat"("B");
+CREATE INDEX IF NOT EXISTS "_IncidentToThreat_B_index" ON "_IncidentToThreat"("B");
 
--- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Add foreign keys only if they do not already exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_organizationId_fkey') THEN
+    ALTER TABLE "users" ADD CONSTRAINT "users_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'refresh_tokens_userId_fkey') THEN
+    ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_sessions_userId_fkey') THEN
+    ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "api_keys" ADD CONSTRAINT "api_keys_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'api_keys_organizationId_fkey') THEN
+    ALTER TABLE "api_keys" ADD CONSTRAINT "api_keys_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "identities" ADD CONSTRAINT "identities_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'identities_organizationId_fkey') THEN
+    ALTER TABLE "identities" ADD CONSTRAINT "identities_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "identity_activities" ADD CONSTRAINT "identity_activities_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'identity_activities_identityId_fkey') THEN
+    ALTER TABLE "identity_activities" ADD CONSTRAINT "identity_activities_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "baselines" ADD CONSTRAINT "baselines_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'baselines_identityId_fkey') THEN
+    ALTER TABLE "baselines" ADD CONSTRAINT "baselines_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "baselines" ADD CONSTRAINT "baselines_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'baselines_organizationId_fkey') THEN
+    ALTER TABLE "baselines" ADD CONSTRAINT "baselines_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "observations" ADD CONSTRAINT "observations_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'observations_identityId_fkey') THEN
+    ALTER TABLE "observations" ADD CONSTRAINT "observations_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "observations" ADD CONSTRAINT "observations_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'observations_organizationId_fkey') THEN
+    ALTER TABLE "observations" ADD CONSTRAINT "observations_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "threats" ADD CONSTRAINT "threats_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'threats_organizationId_fkey') THEN
+    ALTER TABLE "threats" ADD CONSTRAINT "threats_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "threats" ADD CONSTRAINT "threats_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'threats_identityId_fkey') THEN
+    ALTER TABLE "threats" ADD CONSTRAINT "threats_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "incidents" ADD CONSTRAINT "incidents_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'incidents_organizationId_fkey') THEN
+    ALTER TABLE "incidents" ADD CONSTRAINT "incidents_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'actions_organizationId_fkey') THEN
+    ALTER TABLE "actions" ADD CONSTRAINT "actions_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'actions_identityId_fkey') THEN
+    ALTER TABLE "actions" ADD CONSTRAINT "actions_identityId_fkey" FOREIGN KEY ("identityId") REFERENCES "identities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_threatId_fkey" FOREIGN KEY ("threatId") REFERENCES "threats"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'actions_threatId_fkey') THEN
+    ALTER TABLE "actions" ADD CONSTRAINT "actions_threatId_fkey" FOREIGN KEY ("threatId") REFERENCES "threats"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "actions" ADD CONSTRAINT "actions_playbookId_fkey" FOREIGN KEY ("playbookId") REFERENCES "playbooks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'actions_playbookId_fkey') THEN
+    ALTER TABLE "actions" ADD CONSTRAINT "actions_playbookId_fkey" FOREIGN KEY ("playbookId") REFERENCES "playbooks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "playbooks" ADD CONSTRAINT "playbooks_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'playbooks_organizationId_fkey') THEN
+    ALTER TABLE "playbooks" ADD CONSTRAINT "playbooks_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "compliance_reports" ADD CONSTRAINT "compliance_reports_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'compliance_reports_organizationId_fkey') THEN
+    ALTER TABLE "compliance_reports" ADD CONSTRAINT "compliance_reports_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'audit_logs_organizationId_fkey') THEN
+    ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'audit_logs_userId_fkey') THEN
+    ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "_IncidentToThreat" ADD CONSTRAINT "_IncidentToThreat_A_fkey" FOREIGN KEY ("A") REFERENCES "incidents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '_IncidentToThreat_A_fkey') THEN
+    ALTER TABLE "_IncidentToThreat" ADD CONSTRAINT "_IncidentToThreat_A_fkey" FOREIGN KEY ("A") REFERENCES "incidents"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
 
--- AddForeignKey
-ALTER TABLE "_IncidentToThreat" ADD CONSTRAINT "_IncidentToThreat_B_fkey" FOREIGN KEY ("B") REFERENCES "threats"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '_IncidentToThreat_B_fkey') THEN
+    ALTER TABLE "_IncidentToThreat" ADD CONSTRAINT "_IncidentToThreat_B_fkey" FOREIGN KEY ("B") REFERENCES "threats"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
