@@ -39,15 +39,13 @@ router.post('/refresh',
 router.post('/forgot-password',
   authRateLimit,
   validate(forgotPasswordSchema),
-  // TODO: Implement forgot password controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AuthController.forgotPassword
 );
 
 router.post('/reset-password',
   authRateLimit,
   validate(resetPasswordSchema),
-  // TODO: Implement reset password controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AuthController.resetPassword
 );
 
 // Protected routes (authentication required)
@@ -59,8 +57,7 @@ router.get('/profile', AuthController.getProfile);
 
 router.post('/change-password',
   validate(changePasswordSchema),
-  // TODO: Implement change password controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AuthController.changePassword
 );
 
 // MFA routes

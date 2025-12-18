@@ -5,7 +5,8 @@
 
 import { useState, useCallback } from 'react';
 
-const API_BASE = 'http://localhost:8080/api/v1/malgenx';
+// Use Next.js API proxy to avoid CORS issues
+const API_BASE = '/api/v1/malgenx';
 
 interface SubmitSampleRequest {
   type: 'file' | 'url';

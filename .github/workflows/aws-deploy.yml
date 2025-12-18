@@ -1,0 +1,262 @@
+# =============================================================================
+# Nexora AWS Deployment Pipeline
+# =============================================================================
+# Builds and deploys all services to AWS ECS
+# =============================================================================
+
+name: AWS Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      service:
+        description: 'Service to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - frontend
+          - backend
+          - ml-service
+          - malgenx
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: nexora
+
+jobs:
+  # Determine environment based on branch or input
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+  # Build and push Frontend
+  build-frontend:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'frontend' || github.event_name == 'push'
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.API_URL }} \
+            --build-arg NEXT_PUBLIC_ENVIRONMENT=${{ needs.setup.outputs.environment }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f infrastructure/aws/docker/Dockerfile.frontend .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # Build and push Backend
+  build-backend:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'backend' || github.event_name == 'push'
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Backend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f infrastructure/aws/docker/Dockerfile.backend .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # Build and push ML Service
+  build-ml-service:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'ml-service' || github.event_name == 'push'
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push ML Service image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-ml-service
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f infrastructure/aws/docker/Dockerfile.ml-service .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # Build and push MalGenX
+  build-malgenx:
+    needs: setup
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == 'all' || github.event.inputs.service == 'malgenx' || github.event_name == 'push'
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push MalGenX image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-malgenx
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f infrastructure/aws/docker/Dockerfile.malgenx .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # Deploy to ECS
+  deploy:
+    needs: [setup, build-frontend, build-backend, build-ml-service, build-malgenx]
+    runs-on: ubuntu-latest
+    if: always() && !cancelled()
+    environment: ${{ needs.setup.outputs.environment }}
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy Frontend to ECS
+        if: needs.build-frontend.result == 'success'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-frontend \
+            --force-new-deployment
+
+      - name: Deploy Backend to ECS
+        if: needs.build-backend.result == 'success'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-backend \
+            --force-new-deployment
+
+      - name: Deploy ML Service to ECS
+        if: needs.build-ml-service.result == 'success'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-ml-service \
+            --force-new-deployment
+
+      - name: Deploy MalGenX to ECS
+        if: needs.build-malgenx.result == 'success'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-cluster \
+            --service ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-malgenx \
+            --force-new-deployment
+
+      - name: Wait for services to stabilize
+        run: |
+          echo "Waiting for ECS services to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-cluster \
+            --services \
+              ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-frontend \
+              ${{ env.PROJECT_NAME }}-${{ needs.setup.outputs.environment }}-backend
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Deployment to ${{ needs.setup.outputs.environment }} complete!"
+          echo "Services deployed:"
+          echo "  - Frontend"
+          echo "  - Backend"
+          echo "  - ML Service"
+          echo "  - MalGenX"

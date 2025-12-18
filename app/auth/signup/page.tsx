@@ -1,16 +1,20 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
-import { Eye, EyeOff, Github, Mail, Lock, User, Building, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Github, Mail, Lock, User, Building, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('professional');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -24,39 +28,125 @@ export default function SignUpPage() {
 
   const plans = [
     {
+      id: 'foundation',
+      name: 'Foundation',
+      price: '$2,500',
+      period: '/month',
+      annualPrice: '$30,000/year',
+      tier: 'foundation',
+      description: 'Essential NHI security for growing teams',
+      features: [
+        'AED - Autonomous Entity Defense',
+        'Up to 500 identities',
+        '25 team members',
+        'Basic NHII visibility',
+        'Standard threat detection',
+        'Email support',
+        '7-day free trial'
+      ]
+    },
+    {
       id: 'professional',
       name: 'Professional',
-      price: '$99',
+      price: '$3,500',
       period: '/month',
-      features: ['Up to 1,000 entities', 'Basic threat detection', 'Email support', '99.9% uptime SLA']
+      annualPrice: '$42,000/year',
+      tier: 'professional',
+      recommended: true,
+      description: 'Complete NHI protection with advanced detection',
+      features: [
+        'Everything in Foundation',
+        'Up to 2,000 identities',
+        '100 team members',
+        'Full NHII + OSINT correlation',
+        'ML behavioral detection',
+        'Breach intelligence alerts',
+        'Compliance reports (SOC2, ISO)',
+        'Priority support'
+      ]
     },
     {
       id: 'enterprise',
       name: 'Enterprise',
-      price: '$299',
+      price: '$4,500',
       period: '/month',
-      features: ['Unlimited entities', 'Advanced AI detection', '24/7 phone support', '99.99% uptime SLA', 'Custom integrations']
+      annualPrice: '$54,000/year',
+      tier: 'enterprise',
+      description: 'Maximum protection with dedicated support',
+      features: [
+        'Everything in Professional',
+        'Unlimited identities',
+        'Unlimited team members',
+        'PQC-ready architecture',
+        'SSO integration',
+        'Custom integrations',
+        'Dedicated success manager',
+        'SLA guarantee',
+        'Architecture reviews'
+      ]
     }
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     
+    // Client-side validation
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
     
     if (!formData.agreeToTerms) {
-      alert('Please agree to the terms and conditions');
+      setError('Please agree to the terms and conditions');
       return;
     }
 
-    // TODO: Implement registration logic
-    console.log('Registration attempt:', { ...formData, selectedPlan });
-    
-    // Redirect to onboarding or dashboard
-    window.location.href = '/client-dashboard';
+    // Password strength validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setError('Password must be at least 8 characters with uppercase, lowercase, number, and special character');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const selectedPlanData = plans.find(p => p.id === selectedPlan);
+      
+      const response = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationName: formData.company,
+          email: formData.email,
+          password: formData.password,
+          fullName: `${formData.firstName} ${formData.lastName}`,
+          subscriptionTier: selectedPlanData?.tier || 'starter',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Registration failed');
+      }
+
+      // Store tokens
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+
+      // Redirect to dashboard
+      router.push('/client-dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,6 +178,13 @@ export default function SignUpPage() {
             <h2 className="text-2xl font-semibold text-foreground mb-6">Create Your Account</h2>
             
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Error Message */}
+              {error && (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-500">{error}</p>
+                </div>
+              )}
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -252,8 +349,15 @@ export default function SignUpPage() {
               </div>
 
               {/* Submit Button */}
-              <Button type="submit" className="w-full" size="lg">
-                Start Free Trial
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  'Start 7-Day Free Trial'
+                )}
               </Button>
             </form>
 
@@ -281,7 +385,7 @@ export default function SignUpPage() {
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-semibold text-foreground mb-2">Choose Your Plan</h2>
-              <p className="text-muted-foreground">Start with a 14-day free trial. No credit card required.</p>
+              <p className="text-muted-foreground">Start with a 7-day free trial. No credit card required.</p>
             </div>
 
             <div className="space-y-4">
@@ -339,7 +443,7 @@ export default function SignUpPage() {
                 <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
                   <CheckCircle className="h-5 w-5 text-blue-400" />
                 </div>
-                <h3 className="font-semibold text-foreground">14-Day Free Trial</h3>
+                <h3 className="font-semibold text-foreground">7-Day Free Trial</h3>
               </div>
               <ul className="space-y-1 text-sm text-muted-foreground">
                 <li>• Full access to all features</li>

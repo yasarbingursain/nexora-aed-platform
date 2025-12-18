@@ -3,6 +3,7 @@ import { logger } from '@/utils/logger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { cacheService, CacheNamespaces, CacheTTL } from './cache.service';
+import { siemService, SiemEvent } from './integrations/siem.service';
 import type {
   CreateThreatInput,
   UpdateThreatInput,
@@ -244,6 +245,33 @@ export class ThreatService {
       severity: threat.severity,
       category: threat.category,
     });
+
+    // Forward to SIEM if configured
+    if (siemService.isAnyConfigured()) {
+      const siemEvent: SiemEvent = {
+        id: threat.id,
+        timestamp: threat.createdAt,
+        severity: threat.severity as 'low' | 'medium' | 'high' | 'critical',
+        category: threat.category,
+        eventType: 'threat_detected',
+        source: 'nexora',
+        sourceIp: threat.sourceIp || undefined,
+        identityId: threat.identityId || undefined,
+        organizationId,
+        title: threat.title,
+        description: threat.description,
+        mitreTactics: data.mitreTactics,
+        mitreTechniques: data.mitreId ? [data.mitreId] : undefined,
+        indicators: validatedIndicators.map(i => `${i.type}:${i.value}`),
+      };
+
+      siemService.sendEvent(siemEvent).catch(err => {
+        logger.error('Failed to forward threat to SIEM', {
+          threatId: threat.id,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+      });
+    }
 
     return {
       ...threat,

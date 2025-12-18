@@ -15,7 +15,7 @@ model Organization {
   id                String              @id @default(cuid())
   name              String
   domain            String?             @unique
-  subscriptionTier  String              @default("free") // free, pro, enterprise
+  subscriptionTier  String              @default("free") // free, foundation, professional, enterprise
   status            OrganizationStatus  @default(ACTIVE)
   maxUsers          Int                 @default(5)
   maxIdentities     Int                 @default(100)
@@ -25,6 +25,12 @@ model Organization {
   deletedAt         DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  
+  // TRIAL & PAYMENT FIELDS
+  trialEndsAt          DateTime?           // 7 days from creation for trial
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?
+  paymentStatus        String              @default("trial") // trial, active, past_due, canceled
 
   // Relations
   users             User[]
@@ -70,6 +76,10 @@ model User {
   failedLoginAttempts Int      @default(0)
   lockedUntil         DateTime?
   lastFailedLogin     DateTime?
+  
+  // Password Reset Fields
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
 
   // Relations
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -906,4 +916,73 @@ model ForensicTimelineEvent {
   @@index([actorId])
   @@index([targetId])
   @@map("forensic_timeline_events")
+}
+
+// SIEM Configuration - Per-organization SIEM integration settings
+model SiemConfiguration {
+  id              String    @id @default(dbgenerated("gen_random_uuid()"))
+  organizationId  String    @map("organization_id")
+  
+  provider        String    // splunk, sentinel, elastic, qradar, syslog
+  name            String
+  description     String?
+  
+  enabled         Boolean   @default(false)
+  isPrimary       Boolean   @default(false) @map("is_primary")
+  
+  connectionConfig Json     @default("{}") @map("connection_config")
+  format          String    @default("cef") // cef, leef, json, syslog
+  
+  batchSize       Int       @default(50) @map("batch_size")
+  flushIntervalMs Int       @default(10000) @map("flush_interval_ms")
+  
+  severityFilter  String[]  @map("severity_filter")
+  categoryFilter  String[]  @map("category_filter")
+  
+  lastSuccessfulSend DateTime? @map("last_successful_send")
+  lastError       String?   @map("last_error")
+  lastErrorAt     DateTime? @map("last_error_at")
+  eventsSentTotal BigInt    @default(0) @map("events_sent_total")
+  eventsFailedTotal BigInt  @default(0) @map("events_failed_total")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdBy       String?   @map("created_by")
+  updatedBy       String?   @map("updated_by")
+  
+  @@unique([organizationId, provider, name], name: "unique_siem_provider_per_org")
+  @@index([organizationId])
+  @@index([provider])
+  @@index([enabled])
+  @@map("siem_configurations")
+}
+
+// SIEM Event Log - Audit and replay capability
+model SiemEventLog {
+  id              BigInt    @id @default(autoincrement())
+  organizationId  String    @map("organization_id")
+  configurationId String?   @map("configuration_id")
+  
+  eventId         String    @map("event_id")
+  eventType       String    @map("event_type")
+  severity        String
+  category        String?
+  
+  format          String
+  formattedEvent  String    @map("formatted_event")
+  
+  status          String    @default("pending") // pending, sent, failed, retrying
+  retryCount      Int       @default(0) @map("retry_count")
+  maxRetries      Int       @default(3) @map("max_retries")
+  
+  errorMessage    String?   @map("error_message")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  sentAt          DateTime? @map("sent_at")
+  
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([eventId])
+  @@map("siem_event_log")
 }

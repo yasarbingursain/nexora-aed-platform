@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+// Use Next.js API proxy to avoid CORS issues
+const BACKEND_URL = '/api/v1';
 
 interface ThreatEvent {
   id: string;

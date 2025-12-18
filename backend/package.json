@@ -71,6 +71,7 @@
     "redis": "^4.6.11",
     "socket.io": "^4.7.4",
     "speakeasy": "^2.0.0",
+    "stripe": "^20.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.1",

@@ -65,7 +65,8 @@ export const globalRateLimit = async (req: Request, res: Response, next: NextFun
 export const organizationRateLimit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.user?.organizationId) {
-      return next(); // Skip if no organization context
+      next();
+      return;
     }
 
     const key = `${req.user.organizationId}:${req.ip}`;
@@ -82,11 +83,12 @@ export const organizationRateLimit = async (req: Request, res: Response, next: N
       'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext).toISOString(),
     });
     
-    return res.status(429).json({
+    res.status(429).json({
       error: 'Too many requests',
       message: 'Organization rate limit exceeded. Please try again later.',
       retryAfter: Math.round(msBeforeNext / 1000),
     });
+    return;
   }
 };
 
@@ -118,7 +120,8 @@ export const apiKeyRateLimit = async (req: Request, res: Response, next: NextFun
   try {
     const apiKey = req.headers['x-api-key'] as string;
     if (!apiKey) {
-      return next(); // Skip if no API key
+      next();
+      return;
     }
 
     const key = `api_key:${apiKey}`;
@@ -135,11 +138,12 @@ export const apiKeyRateLimit = async (req: Request, res: Response, next: NextFun
       'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext).toISOString(),
     });
     
-    return res.status(429).json({
+    res.status(429).json({
       error: 'API key rate limit exceeded',
       message: 'Too many requests with this API key. Please try again later.',
       retryAfter: Math.round(msBeforeNext / 1000),
     });
+    return;
   }
 };
 

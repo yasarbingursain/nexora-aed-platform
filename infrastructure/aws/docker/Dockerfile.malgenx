@@ -1,0 +1,51 @@
+# =============================================================================
+# Nexora MalGenX Service - Production Dockerfile
+# =============================================================================
+# FastAPI threat intelligence service
+# =============================================================================
+
+FROM python:3.11-slim AS base
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+FROM base AS builder
+COPY backend-malgenx/requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Production image
+FROM base AS runner
+
+# Create non-root user
+RUN groupadd --system --gid 1001 python && \
+    useradd --system --uid 1001 --gid python malgenx
+
+# Copy installed packages from builder
+COPY --from=builder /root/.local /home/malgenx/.local
+ENV PATH=/home/malgenx/.local/bin:$PATH
+
+# Copy application code
+COPY backend-malgenx/app ./app
+
+# Change ownership
+RUN chown -R malgenx:python /app
+
+USER malgenx
+
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:8001/health || exit 1
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

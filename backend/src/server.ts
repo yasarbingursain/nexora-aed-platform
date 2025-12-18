@@ -49,6 +49,15 @@ import cacheRoutes from '@/routes/v1/cache.routes';
 // SOC Routes
 import socRoutes from '@/routes/soc.routes';
 
+// Explainable AI Routes
+import explainableAIRoutes from '@/routes/explainable-ai.routes';
+
+// Billing Routes
+import billingRoutes from '@/routes/billing.routes';
+
+// SIEM Integration Routes
+import siemRoutes from '@/routes/siem.routes';
+
 // ----------------------------------------------------
 // FIX 1: DECLARE SHARED VARS BEFORE THEY ARE USED
 // ----------------------------------------------------
@@ -158,6 +167,15 @@ app.use(`/api/${env.API_VERSION}/admin/cache`, cacheRoutes);
 
 // SOC (Security Operations Center)
 app.use(`/api/${env.API_VERSION}/soc`, socRoutes);
+
+// Explainable AI (GDPR Article 22)
+app.use(`/api/${env.API_VERSION}/explain`, explainableAIRoutes);
+
+// Billing & Subscription
+app.use(`/api/${env.API_VERSION}/billing`, billingRoutes);
+
+// SIEM Integration
+app.use(`/api/${env.API_VERSION}/siem`, siemRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);

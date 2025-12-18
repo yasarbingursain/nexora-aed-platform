@@ -21,9 +21,9 @@ export class BillingService {
 
     const tierPricing: Record<string, number> = {
       'free': 0,
-      'starter': 49,
-      'professional': 199,
-      'enterprise': 999
+      'foundation': 2500,
+      'professional': 3500,
+      'enterprise': 4500
     };
 
     let totalRevenue = 0;
@@ -69,9 +69,9 @@ export class BillingService {
 
     const tierPricing: Record<string, number> = {
       'free': 0,
-      'starter': 49,
-      'professional': 199,
-      'enterprise': 999
+      'foundation': 2500,
+      'professional': 3500,
+      'enterprise': 4500
     };
 
     const monthlyRevenue = tierPricing[organization.subscriptionTier] || 0;

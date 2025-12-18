@@ -8,6 +8,10 @@ const createRedisOptions = () => {
     maxRetriesPerRequest: 3,
     lazyConnect: true,
     keepAlive: 30000,
+    retryStrategy: (times: number) => {
+      if (times > 3) return null; // Stop retrying after 3 attempts
+      return Math.min(times * 100, 3000);
+    },
   };
   
   if (env.REDIS_PASSWORD) {
@@ -17,17 +21,11 @@ const createRedisOptions = () => {
   return options;
 };
 
-// Redis client for general use
-export const redis = new Redis(env.REDIS_URL, createRedisOptions());
-
-// Redis client for BullMQ (separate connection)
-export const redisQueue = new Redis(env.REDIS_URL, createRedisOptions());
-
-// Redis client for rate limiting
-export const redisRateLimit = new Redis(env.REDIS_URL, createRedisOptions());
-
-// Redis client for caching (separate connection)
-export const redisCache = new Redis(env.REDIS_URL, createRedisOptions());
+// Redis clients for production
+const redis = new Redis(env.REDIS_URL, createRedisOptions());
+const redisQueue = new Redis(env.REDIS_URL, createRedisOptions());
+const redisRateLimit = new Redis(env.REDIS_URL, createRedisOptions());
+const redisCache = new Redis(env.REDIS_URL, createRedisOptions());
 
 // Connection event handlers
 redis.on('connect', () => {
@@ -35,23 +33,19 @@ redis.on('connect', () => {
 });
 
 redis.on('error', (err) => {
-  console.error('❌ Redis connection error:', err);
-});
-
-redisQueue.on('connect', () => {
-  console.log('✅ Redis Queue connected');
+  console.error('❌ Redis connection error:', err.message);
 });
 
 redisQueue.on('error', (err) => {
-  console.error('❌ Redis Queue connection error:', err);
-});
-
-redisRateLimit.on('connect', () => {
-  console.log('✅ Redis Rate Limit connected');
+  console.error('❌ Redis Queue connection error:', err.message);
 });
 
 redisRateLimit.on('error', (err) => {
-  console.error('❌ Redis Rate Limit connection error:', err);
+  console.error('❌ Redis Rate Limit connection error:', err.message);
+});
+
+redisCache.on('error', (err) => {
+  console.error('❌ Redis Cache connection error:', err.message);
 });
 
 // Graceful shutdown
@@ -59,10 +53,14 @@ process.on('SIGTERM', async () => {
   await redis.quit();
   await redisQueue.quit();
   await redisRateLimit.quit();
+  await redisCache.quit();
 });
 
 process.on('SIGINT', async () => {
   await redis.quit();
   await redisQueue.quit();
   await redisRateLimit.quit();
+  await redisCache.quit();
 });
+
+export { redis, redisQueue, redisRateLimit, redisCache };

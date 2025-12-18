@@ -1,0 +1,52 @@
+# =============================================================================
+# Nexora AWS Infrastructure - PRODUCTION Environment Variables
+# =============================================================================
+# Production configuration with high availability and redundancy
+# =============================================================================
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "prod"
+project_name = "nexora"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# RDS Configuration (Production sizing)
+db_instance_class = "db.t3.medium"  # Or db.r6g.large for high performance
+db_allocated_storage = 100
+db_name = "nexora_db"
+db_username = "nexora_admin"
+
+# ElastiCache Configuration (Production sizing)
+redis_node_type = "cache.t3.medium"  # Or cache.r6g.large for high performance
+redis_num_cache_nodes = 2  # Multi-AZ with automatic failover
+
+# ECS Configuration (Production sizing)
+frontend_cpu = 512
+frontend_memory = 1024
+frontend_desired_count = 3
+
+backend_cpu = 1024
+backend_memory = 2048
+backend_desired_count = 3
+
+ml_cpu = 1024
+ml_memory = 2048
+ml_desired_count = 2
+
+# Domain Configuration
+domain_name = "nexora.ai"  # Your production domain
+create_dns_records = true
+
+# Tags
+tags = {
+  Project     = "Nexora"
+  ManagedBy   = "Terraform"
+  Environment = "prod"
+  CostCenter  = "Engineering"
+  Compliance  = "SOC2"
+}
