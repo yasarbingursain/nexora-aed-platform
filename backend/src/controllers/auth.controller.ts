@@ -7,6 +7,8 @@ import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '@/config/database';
 import { env } from '@/config/env';
+import { emailService } from '@/services/email.service';
+import { notificationQueueService } from '@/services/notification-queue.service';
 import { AuthenticatedUser } from '@/middleware/auth.middleware';
 import { getClientIP, getUserAgent } from '@/utils/request-helpers';
 import { accountLockoutService } from '@/services/account-lockout.service';
@@ -65,7 +67,21 @@ export class AuthController {
         return { organization, user };
       });
 
-      // Generate JWT tokens
+      // Create session first to get sessionId for refresh token
+      const session = await prisma.userSession.create({
+        data: {
+          userId: result.user.id,
+          sessionToken: '', // Will be updated with refresh token
+          tokenVersion: 1, // Initial version for token rotation
+          ipAddress: getClientIP(req),
+          userAgent: getUserAgent(req),
+          deviceInfo: getUserAgent(req),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          isActive: true,
+        },
+      });
+
+      // Generate JWT tokens with session binding
       const accessToken = jwt.sign(
         {
           userId: result.user.id,
@@ -77,31 +93,21 @@ export class AuthController {
         { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
       );
 
+      // Refresh token includes sessionId and tokenVersion for rotation
       const refreshToken = jwt.sign(
-        { userId: result.user.id },
+        { 
+          userId: result.user.id,
+          sessionId: session.id,
+          tokenVersion: 1,
+        },
         env.JWT_REFRESH_SECRET,
         { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as SignOptions
       );
 
-      // Store refresh token
-      await prisma.refreshToken.create({
-        data: {
-          token: refreshToken,
-          userId: result.user.id,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        },
-      });
-
-      // Create user session
-      await prisma.userSession.create({
-        data: {
-          userId: result.user.id,
-          sessionToken: accessToken,
-          ipAddress: getClientIP(req),
-          userAgent: getUserAgent(req),
-          deviceInfo: getUserAgent(req),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
+      // Update session with refresh token
+      await prisma.userSession.update({
+        where: { id: session.id },
+        data: { sessionToken: refreshToken },
       });
 
       res.status(201).json({
@@ -217,7 +223,21 @@ export class AuthController {
       // SECURITY: Clear failed attempts on successful authentication
       await accountLockoutService.clearFailedAttempts(email, clientIp);
 
-      // Generate JWT tokens
+      // Create session first to get sessionId for refresh token
+      const session = await prisma.userSession.create({
+        data: {
+          userId: user.id,
+          sessionToken: '', // Will be updated with refresh token
+          tokenVersion: 1, // Initial version for token rotation
+          ipAddress: getClientIP(req),
+          userAgent: getUserAgent(req),
+          deviceInfo: getUserAgent(req),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          isActive: true,
+        },
+      });
+
+      // Generate JWT tokens with session binding
       const accessToken = jwt.sign(
         {
           userId: user.id,
@@ -229,36 +249,26 @@ export class AuthController {
         { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
       );
 
+      // Refresh token includes sessionId and tokenVersion for rotation
       const refreshToken = jwt.sign(
-        { userId: user.id },
+        { 
+          userId: user.id,
+          sessionId: session.id,
+          tokenVersion: 1,
+        },
         env.JWT_REFRESH_SECRET,
         { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as SignOptions
       );
 
-      // Store refresh token
-      await prisma.refreshToken.create({
-        data: {
-          token: refreshToken,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        },
-      });
-
-      // Update last login and create session
+      // Update session with refresh token
       await Promise.all([
+        prisma.userSession.update({
+          where: { id: session.id },
+          data: { sessionToken: refreshToken },
+        }),
         prisma.user.update({
           where: { id: user.id },
           data: { lastLoginAt: new Date() },
-        }),
-        prisma.userSession.create({
-          data: {
-            userId: user.id,
-            sessionToken: accessToken,
-            ipAddress: getClientIP(req),
-            userAgent: getUserAgent(req),
-            deviceInfo: getUserAgent(req),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          },
         }),
       ]);
 
@@ -288,66 +298,9 @@ export class AuthController {
     }
   }
 
-  // Refresh access token
-  static async refresh(req: Request, res: Response): Promise<Response | void> {
-    try {
-      const { refreshToken } = req.body;
-
-      // Verify refresh token
-      const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as { userId: string };
-
-      // Check if refresh token exists in database
-      const tokenRecord = await prisma.refreshToken.findFirst({
-        where: {
-          token: refreshToken,
-          userId: decoded.userId,
-          expiresAt: { gt: new Date() },
-        },
-        include: {
-          user: {
-            include: { organization: true },
-          },
-        },
-      });
-
-      if (!tokenRecord || !tokenRecord.user.isActive) {
-        res.status(401).json({
-          error: 'Invalid refresh token',
-          message: 'Refresh token is invalid or expired',
-        });
-        return;
-      }
-
-      // Generate new access token
-      const accessToken = jwt.sign(
-        {
-          userId: tokenRecord.user.id,
-          organizationId: tokenRecord.user.organizationId,
-          email: tokenRecord.user.email,
-          role: tokenRecord.user.role,
-        },
-        env.JWT_SECRET,
-        { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
-      );
-
-      res.json({
-        message: 'Token refreshed successfully',
-        accessToken,
-        user: {
-          id: tokenRecord.user.id,
-          email: tokenRecord.user.email,
-          fullName: tokenRecord.user.fullName,
-          role: tokenRecord.user.role,
-        },
-      });
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      res.status(401).json({
-        error: 'Token refresh failed',
-        message: 'Unable to refresh token. Please login again.',
-      });
-    }
-  }
+  // NOTE: Token refresh is handled by TokenRotationService.refreshWithRotation()
+  // This legacy method is kept for backwards compatibility but should not be used
+  // The route /api/v1/auth/refresh uses TokenRotationService for secure token rotation
 
   // Logout user
   static async logout(req: Request, res: Response): Promise<Response | void> {
@@ -482,6 +435,52 @@ export class AuthController {
     try {
       const user = req.user as AuthenticatedUser;
 
+      const { password, token } = req.body as { password: string; token: string };
+
+      // Get user auth data
+      const userData = await prisma.user.findUnique({
+        where: { id: user.userId },
+        select: { passwordHash: true, mfaSecret: true, mfaEnabled: true },
+      });
+
+      if (!userData) {
+        return res.status(404).json({
+          error: 'User not found',
+          message: 'User account not found.',
+        });
+      }
+
+      if (!userData.mfaEnabled || !userData.mfaSecret) {
+        return res.status(400).json({
+          error: 'MFA not enabled',
+          message: 'MFA is not enabled for this account.',
+        });
+      }
+
+      // Require password confirmation
+      const isValidPassword = await bcrypt.compare(password, userData.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({
+          error: 'Invalid password',
+          message: 'Password confirmation failed.',
+        });
+      }
+
+      // Require current MFA token
+      const isValidToken = speakeasy.totp.verify({
+        secret: userData.mfaSecret,
+        encoding: 'base32',
+        token,
+        window: 2,
+      });
+
+      if (!isValidToken) {
+        return res.status(400).json({
+          error: 'Invalid MFA token',
+          message: 'The provided MFA token is invalid.',
+        });
+      }
+
       await prisma.user.update({
         where: { id: user.userId },
         data: {
@@ -597,12 +596,17 @@ export class AuthController {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 
-      // TODO: Send email with reset link
-      // For now, log the reset URL (in production, send via email service)
-      console.log(`Password reset requested for ${email}. Reset URL: ${resetUrl}`);
-
-      // In production, integrate with email service like SendGrid, AWS SES, etc.
-      // await emailService.sendPasswordResetEmail(user.email, user.fullName, resetUrl);
+      // Send password reset email
+      if (emailService.isConfigured()) {
+        await emailService.sendPasswordReset(
+          user.email,
+          user.fullName || 'User',
+          resetUrl,
+          '1 hour'
+        );
+      } else {
+        logger.warn('Email service not configured - password reset email not sent', { email });
+      }
 
       res.json({
         message: 'If an account exists with this email, a password reset link has been sent.',
@@ -666,6 +670,18 @@ export class AuthController {
         where: { userId: user.id },
       });
 
+      // Send notification about password change
+      await notificationQueueService.queueNotification({
+        userId: user.id,
+        organizationId: user.organizationId,
+        type: 'password_change',
+        severity: 'high',
+        title: 'Password Successfully Reset',
+        message: 'Your password has been reset successfully. All active sessions have been terminated.',
+        sendEmail: true,
+        sendWebSocket: true,
+      });
+
       res.json({
         message: 'Password has been reset successfully. Please login with your new password.',
       });
@@ -719,11 +735,31 @@ export class AuthController {
       const saltRounds = 12;
       const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
+      // Get user details for notification
+      const userDetails = await prisma.user.findUnique({
+        where: { id: authUser.userId },
+        select: { email: true, fullName: true, organizationId: true },
+      });
+
       // Update password
       await prisma.user.update({
-        where: { id: user.id },
+        where: { id: authUser.userId },
         data: { passwordHash: newPasswordHash },
       });
+
+      // Send notification about password change
+      if (userDetails) {
+        await notificationQueueService.queueNotification({
+          userId: authUser.userId,
+          organizationId: userDetails.organizationId,
+          type: 'password_change',
+          severity: 'high',
+          title: 'Password Changed',
+          message: 'Your password has been changed successfully. If you did not make this change, please contact your administrator immediately.',
+          sendEmail: true,
+          sendWebSocket: true,
+        });
+      }
 
       // Optionally invalidate other sessions (keep current session active)
       // await prisma.userSession.updateMany({

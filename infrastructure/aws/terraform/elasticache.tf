@@ -1,47 +1,53 @@
 # =============================================================================
-# ElastiCache Redis
+# Nexora AWS Infrastructure - ElastiCache Redis
 # =============================================================================
-# Dev: cache.t3.micro (~$12/month), single node
-# Prod: cache.t3.medium+, cluster mode, multi-AZ
+# Production-grade Redis with encryption, auth, and optional replication
 # =============================================================================
 
 # ElastiCache Subnet Group
 resource "aws_elasticache_subnet_group" "main" {
-  name        = "${var.project_name}-${var.environment}-redis-subnet"
+  name        = "${local.name_prefix}-redis-subnet"
   description = "Redis subnet group for ${var.project_name}"
   subnet_ids  = module.vpc.private_subnets
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-redis-subnet"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-redis-subnet"
+  })
 }
 
 # ElastiCache Parameter Group
 resource "aws_elasticache_parameter_group" "redis" {
-  name        = "${var.project_name}-${var.environment}-redis7-params"
+  name        = "${local.name_prefix}-redis7-params"
   family      = "redis7"
   description = "Redis 7 parameters for ${var.project_name}"
 
+  # Memory management
   parameter {
     name  = "maxmemory-policy"
     value = "volatile-lru"
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-redis7-params"
+  # Persistence
+  parameter {
+    name  = "appendonly"
+    value = "yes"
   }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-redis7-params"
+  })
 }
 
-# ElastiCache Redis Cluster
+# ElastiCache Redis Replication Group
 resource "aws_elasticache_replication_group" "redis" {
-  replication_group_id = "${var.project_name}-${var.environment}-redis"
+  replication_group_id = "${local.name_prefix}-redis"
   description          = "Redis cluster for ${var.project_name} ${var.environment}"
 
   # Engine
   engine               = "redis"
   engine_version       = "7.1"
   node_type            = var.redis_node_type
-  port                 = 6379
+  port                 = local.ports.redis
 
   # Cluster Configuration
   num_cache_clusters         = var.redis_num_cache_nodes
@@ -56,6 +62,7 @@ resource "aws_elasticache_replication_group" "redis" {
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
   auth_token                 = random_password.redis_auth_token.result
+  kms_key_id                 = aws_kms_key.main.arn
 
   # Parameters
   parameter_group_name = aws_elasticache_parameter_group.redis.name
@@ -63,12 +70,20 @@ resource "aws_elasticache_replication_group" "redis" {
   # Maintenance
   maintenance_window       = "sun:05:00-sun:06:00"
   snapshot_window          = "04:00-05:00"
-  snapshot_retention_limit = var.environment == "dev" ? 1 : 7
+  snapshot_retention_limit = local.is_prod ? 7 : 1
 
-  # Auto minor version upgrade
+  # Updates
   auto_minor_version_upgrade = true
+  apply_immediately          = !local.is_prod
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-redis"
+  # Notifications
+  notification_topic_arn = local.is_prod && var.alarm_email != "" ? aws_sns_topic.alerts[0].arn : null
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-redis"
+  })
+
+  lifecycle {
+    ignore_changes = [num_cache_clusters]
   }
 }

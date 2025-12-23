@@ -61,11 +61,31 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       });
     }
 
-    // Update last activity
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+    // SECURITY: Verify user has at least one active session
+    const activeSession = await prisma.userSession.findFirst({
+      where: {
+        userId: user.id,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
     });
+
+    if (!activeSession) {
+      return res.status(401).json({ 
+        error: 'Session expired',
+        message: 'Your session has expired. Please login again.'
+      });
+    }
+
+    // Update session last activity (throttled to avoid DB spam)
+    const lastActivity = activeSession.lastActivity;
+    const now = new Date();
+    if (!lastActivity || now.getTime() - lastActivity.getTime() > 60000) { // Update at most once per minute
+      await prisma.userSession.update({
+        where: { id: activeSession.id },
+        data: { lastActivity: now },
+      }).catch(() => {}); // Non-blocking update
+    }
 
     // Attach user to request
     req.user = {

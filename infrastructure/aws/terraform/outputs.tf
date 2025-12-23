@@ -1,10 +1,11 @@
 # =============================================================================
-# Terraform Outputs
+# Nexora AWS Infrastructure - Outputs
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# VPC Outputs
+# Network Outputs
 # -----------------------------------------------------------------------------
+
 output "vpc_id" {
   description = "VPC ID"
   value       = module.vpc.vpc_id
@@ -21,8 +22,9 @@ output "public_subnets" {
 }
 
 # -----------------------------------------------------------------------------
-# ALB Outputs
+# Load Balancer Outputs
 # -----------------------------------------------------------------------------
+
 output "alb_dns_name" {
   description = "ALB DNS name"
   value       = aws_lb.main.dns_name
@@ -46,10 +48,10 @@ output "api_url" {
 # -----------------------------------------------------------------------------
 # Database Outputs
 # -----------------------------------------------------------------------------
+
 output "rds_endpoint" {
   description = "RDS endpoint"
   value       = aws_db_instance.postgres.endpoint
-  sensitive   = true
 }
 
 output "rds_port" {
@@ -57,46 +59,29 @@ output "rds_port" {
   value       = aws_db_instance.postgres.port
 }
 
+output "rds_database_name" {
+  description = "RDS database name"
+  value       = aws_db_instance.postgres.db_name
+}
+
 # -----------------------------------------------------------------------------
 # Redis Outputs
 # -----------------------------------------------------------------------------
+
 output "redis_endpoint" {
   description = "Redis primary endpoint"
   value       = aws_elasticache_replication_group.redis.primary_endpoint_address
-  sensitive   = true
 }
 
 output "redis_port" {
   description = "Redis port"
-  value       = 6379
-}
-
-# -----------------------------------------------------------------------------
-# ECR Outputs
-# -----------------------------------------------------------------------------
-output "ecr_frontend_url" {
-  description = "ECR Frontend repository URL"
-  value       = aws_ecr_repository.frontend.repository_url
-}
-
-output "ecr_backend_url" {
-  description = "ECR Backend repository URL"
-  value       = aws_ecr_repository.backend.repository_url
-}
-
-output "ecr_ml_service_url" {
-  description = "ECR ML Service repository URL"
-  value       = aws_ecr_repository.ml_service.repository_url
-}
-
-output "ecr_malgenx_url" {
-  description = "ECR MalGenX repository URL"
-  value       = aws_ecr_repository.malgenx.repository_url
+  value       = local.ports.redis
 }
 
 # -----------------------------------------------------------------------------
 # ECS Outputs
 # -----------------------------------------------------------------------------
+
 output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = aws_ecs_cluster.main.name
@@ -107,79 +92,127 @@ output "ecs_cluster_arn" {
   value       = aws_ecs_cluster.main.arn
 }
 
+output "frontend_service_name" {
+  description = "Frontend ECS service name"
+  value       = aws_ecs_service.frontend.name
+}
+
+output "backend_service_name" {
+  description = "Backend ECS service name"
+  value       = aws_ecs_service.backend.name
+}
+
 # -----------------------------------------------------------------------------
-# Secrets Manager Outputs
+# ECR Outputs
 # -----------------------------------------------------------------------------
-output "secrets_db_credentials_arn" {
+
+output "ecr_frontend_url" {
+  description = "Frontend ECR repository URL"
+  value       = aws_ecr_repository.frontend.repository_url
+}
+
+output "ecr_backend_url" {
+  description = "Backend ECR repository URL"
+  value       = aws_ecr_repository.backend.repository_url
+}
+
+output "ecr_ml_service_url" {
+  description = "ML Service ECR repository URL"
+  value       = aws_ecr_repository.ml_service.repository_url
+}
+
+output "ecr_malgenx_url" {
+  description = "MalGenX ECR repository URL"
+  value       = aws_ecr_repository.malgenx.repository_url
+}
+
+# -----------------------------------------------------------------------------
+# Secrets Outputs
+# -----------------------------------------------------------------------------
+
+output "db_credentials_secret_arn" {
   description = "Database credentials secret ARN"
   value       = aws_secretsmanager_secret.db_credentials.arn
 }
 
-output "secrets_redis_credentials_arn" {
+output "redis_credentials_secret_arn" {
   description = "Redis credentials secret ARN"
   value       = aws_secretsmanager_secret.redis_credentials.arn
 }
 
-output "secrets_jwt_arn" {
+output "jwt_secrets_arn" {
   description = "JWT secrets ARN"
   value       = aws_secretsmanager_secret.jwt_secrets.arn
 }
 
-output "secrets_app_arn" {
+output "app_secrets_arn" {
   description = "Application secrets ARN"
   value       = aws_secretsmanager_secret.app_secrets.arn
 }
 
 # -----------------------------------------------------------------------------
-# Service Discovery Outputs
+# Security Outputs
 # -----------------------------------------------------------------------------
-output "service_discovery_namespace" {
-  description = "Service discovery namespace"
-  value       = aws_service_discovery_private_dns_namespace.main.name
+
+output "kms_key_arn" {
+  description = "KMS key ARN"
+  value       = aws_kms_key.main.arn
 }
 
-output "ml_service_discovery_name" {
-  description = "ML service discovery DNS name"
-  value       = "ml-service.${aws_service_discovery_private_dns_namespace.main.name}"
-}
-
-output "malgenx_service_discovery_name" {
-  description = "MalGenX service discovery DNS name"
-  value       = "malgenx.${aws_service_discovery_private_dns_namespace.main.name}"
+output "waf_web_acl_arn" {
+  description = "WAF Web ACL ARN"
+  value       = var.enable_waf ? aws_wafv2_web_acl.main[0].arn : null
 }
 
 # -----------------------------------------------------------------------------
-# Cost Estimate
+# IAM Outputs
 # -----------------------------------------------------------------------------
-output "estimated_monthly_cost" {
-  description = "Estimated monthly cost for dev environment"
-  value       = <<-EOT
-    
-    ============================================
-    ESTIMATED MONTHLY COST (DEV ENVIRONMENT)
-    ============================================
-    
-    RDS PostgreSQL (db.t3.micro):     ~$12/month
-    ElastiCache Redis (cache.t3.micro): ~$12/month
-    NAT Gateway (single):              ~$32/month
-    ALB:                               ~$16/month
-    ECS Fargate (4 services, minimal): ~$30/month
-    ECR Storage:                       ~$1/month
-    Secrets Manager (4 secrets):       ~$2/month
-    CloudWatch Logs:                   ~$5/month
-    Data Transfer:                     ~$10/month
-    --------------------------------------------
-    TOTAL ESTIMATED:                   ~$120/month
-    
-    NOTE: Actual costs may vary based on usage.
-    Use AWS Cost Explorer for accurate tracking.
-    
-    PRODUCTION SCALING:
-    - RDS: db.t3.medium + Multi-AZ = ~$50/month
-    - Redis: cache.t3.medium + replica = ~$50/month
-    - NAT Gateway: per AZ = ~$64/month
-    - ECS: increased task counts = ~$100/month
-    - Total Prod Estimate: ~$300-400/month
-    
-  EOT
+
+output "ecs_execution_role_arn" {
+  description = "ECS execution role ARN"
+  value       = aws_iam_role.ecs_execution.arn
+}
+
+output "ecs_task_role_arn" {
+  description = "ECS task role ARN"
+  value       = aws_iam_role.ecs_task.arn
+}
+
+output "github_actions_user_arn" {
+  description = "GitHub Actions IAM user ARN"
+  value       = aws_iam_user.github_actions.arn
+}
+
+# -----------------------------------------------------------------------------
+# Monitoring Outputs
+# -----------------------------------------------------------------------------
+
+output "cloudwatch_log_groups" {
+  description = "CloudWatch log group names"
+  value = {
+    frontend   = aws_cloudwatch_log_group.frontend.name
+    backend    = aws_cloudwatch_log_group.backend.name
+    ml_service = aws_cloudwatch_log_group.ml_service.name
+    malgenx    = aws_cloudwatch_log_group.malgenx.name
+  }
+}
+
+output "sns_alerts_topic_arn" {
+  description = "SNS alerts topic ARN"
+  value       = var.alarm_email != "" ? aws_sns_topic.alerts[0].arn : null
+}
+
+# -----------------------------------------------------------------------------
+# Deployment Info
+# -----------------------------------------------------------------------------
+
+output "deployment_info" {
+  description = "Deployment information"
+  value = {
+    environment     = var.environment
+    region          = var.aws_region
+    account_id      = data.aws_caller_identity.current.account_id
+    cluster_name    = aws_ecs_cluster.main.name
+    app_url         = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}"
+  }
 }

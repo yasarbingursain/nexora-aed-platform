@@ -1,453 +1,404 @@
 # Nexora AWS Deployment Guide
 
+## Enterprise-Grade Infrastructure for Startups
+
+---
+
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              AWS Cloud (us-east-1)                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         VPC (10.0.0.0/16)                           │   │
-│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
-│  │  │                    Public Subnets                            │   │   │
-│  │  │  ┌─────────────────────────────────────────────────────┐    │   │   │
-│  │  │  │              Application Load Balancer               │    │   │   │
-│  │  │  │         (HTTPS:443, HTTP:80 → redirect)             │    │   │   │
-│  │  │  └─────────────────────────────────────────────────────┘    │   │   │
-│  │  │                           │                                  │   │   │
-│  │  │                    NAT Gateway                               │   │   │
-│  │  └───────────────────────────┼──────────────────────────────────┘   │   │
-│  │                              │                                       │   │
-│  │  ┌───────────────────────────┼──────────────────────────────────┐   │   │
-│  │  │                    Private Subnets                           │   │   │
-│  │  │                           │                                  │   │   │
-│  │  │  ┌────────────────────────┴────────────────────────────┐    │   │   │
-│  │  │  │                 ECS Fargate Cluster                  │    │   │   │
-│  │  │  │  ┌──────────┐ ┌──────────┐ ┌────────┐ ┌──────────┐  │    │   │   │
-│  │  │  │  │ Frontend │ │ Backend  │ │   ML   │ │ MalGenX  │  │    │   │   │
-│  │  │  │  │  :3000   │ │  :8080   │ │ :8000  │ │  :8001   │  │    │   │   │
-│  │  │  │  └──────────┘ └──────────┘ └────────┘ └──────────┘  │    │   │   │
-│  │  │  └─────────────────────────────────────────────────────┘    │   │   │
-│  │  │                           │                                  │   │   │
-│  │  │  ┌────────────────────────┴────────────────────────────┐    │   │   │
-│  │  │  │                   Data Layer                         │    │   │   │
-│  │  │  │  ┌──────────────────┐    ┌──────────────────────┐   │    │   │   │
-│  │  │  │  │ RDS PostgreSQL   │    │  ElastiCache Redis   │   │    │   │   │
-│  │  │  │  │   (db.t3.micro)  │    │  (cache.t3.micro)    │   │    │   │   │
-│  │  │  │  └──────────────────┘    └──────────────────────┘   │    │   │   │
-│  │  │  └─────────────────────────────────────────────────────┘    │   │   │
-│  │  └──────────────────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                         VPC (10.0.0.0/16)                             │  │
+│  │                                                                       │  │
+│  │   ┌─────────────┐     ┌─────────────────────────────────────────┐    │  │
+│  │   │  WAF + ALB  │────▶│           Public Subnets                │    │  │
+│  │   │  (HTTPS)    │     │         (NAT Gateway)                   │    │  │
+│  │   └──────┬──────┘     └─────────────────────────────────────────┘    │  │
+│  │          │                                                           │  │
+│  │   ┌──────▼──────────────────────────────────────────────────────┐    │  │
+│  │   │                    Private Subnets                          │    │  │
+│  │   │  ┌────────────────────────────────────────────────────────┐ │    │  │
+│  │   │  │              ECS Fargate Cluster                       │ │    │  │
+│  │   │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │ │    │  │
+│  │   │  │  │ Frontend │ │ Backend  │ │ML Service│ │ MalGenX  │  │ │    │  │
+│  │   │  │  │ (Next.js)│ │ (Node)   │ │ (Python) │ │ (Python) │  │ │    │  │
+│  │   │  │  └──────────┘ └────┬─────┘ └──────────┘ └──────────┘  │ │    │  │
+│  │   │  └────────────────────┼───────────────────────────────────┘ │    │  │
+│  │   │                       │                                     │    │  │
+│  │   │  ┌────────────────────▼─────────────────────────────────┐   │    │  │
+│  │   │  │  ┌─────────────────────┐  ┌────────────────────────┐ │   │    │  │
+│  │   │  │  │  RDS PostgreSQL 16  │  │  ElastiCache Redis 7   │ │   │    │  │
+│  │   │  │  │  (Multi-AZ in prod) │  │  (Cluster mode)        │ │   │    │  │
+│  │   │  │  └─────────────────────┘  └────────────────────────┘ │   │    │  │
+│  │   │  └──────────────────────────────────────────────────────┘   │    │  │
+│  │   └─────────────────────────────────────────────────────────────┘    │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐ │
-│  │  Secrets Manager │  │       ECR       │  │      CloudWatch Logs        │ │
-│  │  (credentials)   │  │  (containers)   │  │      (monitoring)           │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────────┘ │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │
+│  │     ECR      │ │   Secrets    │ │     KMS      │ │  CloudWatch  │       │
+│  │  (Registry)  │ │   Manager    │ │ (Encryption) │ │   (Logs)     │       │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘       │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Cost Breakdown
+## Cost Estimates
 
-### DEV Environment (~$120/month)
-
-| Service | Instance Type | Monthly Cost |
-|---------|--------------|--------------|
-| RDS PostgreSQL | db.t3.micro | ~$12 |
-| ElastiCache Redis | cache.t3.micro | ~$12 |
-| NAT Gateway (single) | - | ~$32 |
-| ALB | - | ~$16 |
-| ECS Fargate (4 services) | 0.25-0.5 vCPU | ~$30 |
-| ECR Storage | ~2GB | ~$1 |
-| Secrets Manager (4) | - | ~$2 |
-| CloudWatch Logs | - | ~$5 |
-| Data Transfer | ~10GB | ~$10 |
-| **TOTAL** | | **~$120/month** |
-
-### PRODUCTION Environment (~$350-400/month)
-
-| Service | Instance Type | Monthly Cost |
-|---------|--------------|--------------|
-| RDS PostgreSQL | db.t3.medium + Multi-AZ | ~$50 |
-| ElastiCache Redis | cache.t3.medium + replica | ~$50 |
-| NAT Gateway (per AZ) | 2 AZs | ~$64 |
-| ALB | - | ~$20 |
-| ECS Fargate (scaled) | 1-2 vCPU | ~$100 |
-| ECR Storage | ~5GB | ~$2 |
-| Secrets Manager | - | ~$2 |
-| CloudWatch Logs + Insights | - | ~$20 |
-| Data Transfer | ~50GB | ~$50 |
-| **TOTAL** | | **~$350-400/month** |
+| Environment | Monthly Cost | Key Optimizations |
+|-------------|--------------|-------------------|
+| **Dev**     | ~$100-120    | Fargate Spot, single NAT, t3.micro instances |
+| **Staging** | ~$180-220    | Fargate Spot, single NAT, t3.small instances |
+| **Prod**    | ~$350-450    | Fargate On-Demand, Multi-AZ, t3.medium instances |
 
 ---
 
 ## Prerequisites
 
-1. **AWS Account** with admin access
-2. **AWS CLI** installed and configured
-3. **Terraform** >= 1.5.0
-4. **Docker** installed
-5. **Git** for version control
+- AWS Account with admin access
+- AWS CLI v2 installed
+- Terraform v1.6+ installed
+- Docker installed
+- Git access to repository
 
-### Install AWS CLI
+---
+
+## Step 1: Install Tools
+
+### macOS
 ```bash
-# Windows (PowerShell)
-msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi
+brew install awscli terraform docker
+```
 
-# macOS
-brew install awscli
-
-# Linux
+### Linux
+```bash
+# AWS CLI
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip && sudo ./aws/install
+
+# Terraform
+sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
+wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
 ```
 
-### Configure AWS CLI
-```bash
-aws configure
-# Enter: AWS Access Key ID, Secret Access Key, Region (us-east-1), Output format (json)
+### Windows (PowerShell Admin)
+```powershell
+choco install awscli terraform docker-desktop -y
 ```
 
-### Install Terraform
+### Verify
 ```bash
-# Windows (Chocolatey)
-choco install terraform
-
-# macOS
-brew install terraform
-
-# Linux
-wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-unzip terraform_1.6.0_linux_amd64.zip && sudo mv terraform /usr/local/bin/
+aws --version && terraform --version && docker --version
 ```
 
 ---
 
-## Deployment Steps
+## Step 2: Configure AWS Credentials
 
-### Step 1: Configure Variables
+```bash
+aws configure
+# AWS Access Key ID: YOUR_KEY
+# AWS Secret Access Key: YOUR_SECRET
+# Default region: us-east-1
+# Default output format: json
+
+# Verify
+aws sts get-caller-identity
+```
+
+---
+
+## Step 3: Setup Remote State (One-time)
+
+```bash
+cd infrastructure/aws/scripts
+chmod +x setup-remote-state.sh
+./setup-remote-state.sh
+```
+
+Then uncomment the backend block in `infrastructure/aws/terraform/versions.tf`:
+
+```hcl
+backend "s3" {
+  bucket         = "nexora-terraform-state-YOUR_ACCOUNT_ID"
+  key            = "nexora/terraform.tfstate"
+  region         = "us-east-1"
+  encrypt        = true
+  dynamodb_table = "nexora-terraform-locks"
+}
+```
+
+---
+
+## Step 4: Deploy Infrastructure
 
 ```bash
 cd infrastructure/aws/terraform
 
-# Copy example and edit with your values
-cp terraform.tfvars.example terraform.tfvars
-
-# Edit terraform.tfvars with your configuration
-```
-
-### Step 2: Initialize Terraform
-
-```bash
+# Initialize
 terraform init
+
+# Plan (review changes)
+terraform plan -var-file=envs/dev.tfvars
+
+# Apply
+terraform apply -var-file=envs/dev.tfvars
+
+# Save outputs
+terraform output -json > outputs.json
 ```
 
-### Step 3: Review Infrastructure Plan
+### Environment Files
+- `envs/dev.tfvars` - Development (~$100/mo)
+- `envs/staging.tfvars` - Staging (~$200/mo)
+- `envs/prod.tfvars` - Production (~$400/mo)
+
+---
+
+## Step 5: Configure Secrets
+
+After Terraform creates secrets, update with real values:
 
 ```bash
-terraform plan
+# Get secret ARN
+SECRET_ARN=$(aws secretsmanager list-secrets \
+  --query "SecretList[?contains(Name,'app-secrets')].ARN" \
+  --output text)
+
+# Update secrets
+aws secretsmanager put-secret-value \
+  --secret-id $SECRET_ARN \
+  --secret-string '{
+    "stripe_secret_key": "sk_live_xxx",
+    "stripe_webhook_secret": "whsec_xxx",
+    "sentry_dsn": "https://xxx@sentry.io/xxx"
+  }'
 ```
 
-### Step 4: Deploy Infrastructure
+---
+
+## Step 6: Build & Deploy Services
 
 ```bash
-terraform apply
+cd infrastructure/aws/scripts
+chmod +x deploy.sh
+
+# Deploy all services
+./deploy.sh dev deploy all
+
+# Or deploy individually
+./deploy.sh dev deploy backend
+./deploy.sh dev deploy frontend
 ```
 
-**This creates:**
-- VPC with public/private subnets
-- NAT Gateway
-- Application Load Balancer
-- RDS PostgreSQL database
-- ElastiCache Redis cluster
-- ECS Fargate cluster
-- ECR repositories
-- Secrets Manager secrets
-- Security groups
-- IAM roles
+---
 
-### Step 5: Build and Push Docker Images
-
-```powershell
-# Windows
-.\infrastructure\aws\scripts\deploy.ps1 -Environment dev -Service all
-
-# Linux/macOS
-./infrastructure/aws/scripts/deploy.sh dev all
-```
-
-### Step 6: Run Database Migrations
+## Step 7: Run Database Migrations
 
 ```bash
-# Using the deploy script
-./infrastructure/aws/scripts/deploy.sh dev migrate
+./deploy.sh dev migrate
+```
 
-# Or manually via AWS CLI
-aws ecs run-task \
+---
+
+## Step 8: Configure GitHub Actions
+
+### Add Repository Secrets
+
+Go to GitHub → Settings → Secrets → Actions, add:
+
+| Secret | Value |
+|--------|-------|
+| `AWS_ACCESS_KEY_ID` | From Terraform output or IAM |
+| `AWS_SECRET_ACCESS_KEY` | From Terraform output or IAM |
+| `API_URL` | ALB DNS or your domain |
+
+### Create Environments
+
+1. Go to Settings → Environments
+2. Create: `dev`, `staging`, `prod`
+3. For `prod`: Add required reviewers
+
+---
+
+## Step 9: Configure Domain (Optional)
+
+1. Update tfvars:
+```hcl
+domain_name        = "nexora.ai"
+create_dns_records = true
+```
+
+2. Apply:
+```bash
+terraform apply -var-file=envs/prod.tfvars
+```
+
+3. Update DNS at your registrar to point to Route53 nameservers
+
+---
+
+## Common Commands
+
+### View Logs
+```bash
+./deploy.sh dev logs backend
+```
+
+### Check Status
+```bash
+./deploy.sh dev status
+```
+
+### Rollback
+```bash
+./deploy.sh dev rollback backend
+```
+
+### SSH into Container
+```bash
+./deploy.sh dev exec backend
+```
+
+### Scale Service
+```bash
+aws ecs update-service \
   --cluster nexora-dev-cluster \
-  --task-definition nexora-dev-backend \
-  --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx]}" \
-  --overrides '{"containerOverrides":[{"name":"backend","command":["npx","prisma","migrate","deploy"]}]}'
+  --service nexora-dev-backend \
+  --desired-count 3
 ```
 
-### Step 7: Verify Deployment
+---
 
+## Monitoring
+
+### CloudWatch Alarms (auto-configured)
+- ECS CPU/Memory > 85%
+- RDS CPU > 80%
+- RDS Storage < 5GB
+- Redis Memory > 80%
+- ALB 5XX errors > 10/min
+- ALB latency p95 > 2s
+
+### View Metrics
 ```bash
-# Get ALB DNS name
-terraform output alb_dns_name
-
-# Test endpoints
-curl https://<alb-dns>/api/health
-curl https://<alb-dns>/api/healthz
-```
-
----
-
-## CI/CD Pipeline
-
-The GitHub Actions workflow (`.github/workflows/aws-deploy.yml`) automatically:
-
-1. **On push to `develop`**: Deploy to dev environment
-2. **On push to `main`**: Deploy to prod environment
-3. **Manual trigger**: Deploy specific service to specific environment
-
-### Required GitHub Secrets
-
-Add these secrets in GitHub repository settings:
-
-| Secret | Description |
-|--------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS IAM user secret key |
-| `API_URL` | Backend API URL for frontend build |
-
-### Manual Deployment
-
-```bash
-# Trigger via GitHub CLI
-gh workflow run aws-deploy.yml -f environment=dev -f service=backend
-```
-
----
-
-## Security Considerations
-
-### Network Security
-- All services run in **private subnets**
-- Only ALB is publicly accessible
-- Security groups restrict traffic to necessary ports only
-- NAT Gateway for outbound internet access
-
-### Data Security
-- **RDS encryption** at rest using KMS
-- **Redis encryption** in transit and at rest
-- **Secrets Manager** for all credentials (no hardcoded secrets)
-- **TLS 1.3** on ALB
-
-### IAM Security
-- **Least privilege** IAM roles for ECS tasks
-- Tasks can only access their required secrets
-- No root credentials used
-
-### Compliance
-- VPC Flow Logs enabled (production)
-- CloudWatch Logs for audit trail
-- Automated security scanning on ECR push
-
----
-
-## Scaling Strategy
-
-### Horizontal Scaling (ECS)
-
-```hcl
-# In terraform.tfvars for production
-frontend_desired_count = 3
-backend_desired_count = 3
-ml_desired_count = 2
-```
-
-Auto-scaling can be added:
-```hcl
-resource "aws_appautoscaling_target" "backend" {
-  max_capacity       = 10
-  min_capacity       = 2
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.backend.name}"
-  scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace  = "ecs"
-}
-
-resource "aws_appautoscaling_policy" "backend_cpu" {
-  name               = "backend-cpu-scaling"
-  policy_type        = "TargetTrackingScaling"
-  resource_id        = aws_appautoscaling_target.backend.resource_id
-  scalable_dimension = aws_appautoscaling_target.backend.scalable_dimension
-  service_namespace  = aws_appautoscaling_target.backend.service_namespace
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageCPUUtilization"
-    }
-    target_value = 70.0
-  }
-}
-```
-
-### Vertical Scaling (RDS/Redis)
-
-```hcl
-# Upgrade instance class
-db_instance_class = "db.t3.large"
-redis_node_type   = "cache.t3.large"
-```
-
-### Database Read Replicas (Production)
-
-```hcl
-resource "aws_db_instance" "read_replica" {
-  identifier             = "nexora-prod-postgres-replica"
-  replicate_source_db    = aws_db_instance.postgres.identifier
-  instance_class         = "db.t3.medium"
-  publicly_accessible    = false
-  vpc_security_group_ids = [aws_security_group.rds.id]
-}
-```
-
----
-
-## Monitoring & Alerting
-
-### CloudWatch Dashboards
-
-Access via AWS Console → CloudWatch → Dashboards
-
-Key metrics to monitor:
-- ECS CPU/Memory utilization
-- RDS connections, CPU, storage
-- Redis memory, connections
-- ALB request count, latency, 5xx errors
-
-### CloudWatch Alarms (Add to Terraform)
-
-```hcl
-resource "aws_cloudwatch_metric_alarm" "high_cpu" {
-  alarm_name          = "nexora-${var.environment}-high-cpu"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/ECS"
-  period              = 300
-  statistic           = "Average"
-  threshold           = 80
-  alarm_description   = "ECS CPU utilization is high"
-  
-  dimensions = {
-    ClusterName = aws_ecs_cluster.main.name
-    ServiceName = aws_ecs_service.backend.name
-  }
-}
+# ECS service metrics
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name CPUUtilization \
+  --dimensions Name=ClusterName,Value=nexora-dev-cluster \
+  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 300 \
+  --statistics Average
 ```
 
 ---
 
 ## Troubleshooting
 
-### View ECS Logs
-
+### ECS Tasks Not Starting
 ```bash
-# Via AWS CLI
+# Check stopped task reason
+aws ecs describe-tasks \
+  --cluster nexora-dev-cluster \
+  --tasks $(aws ecs list-tasks --cluster nexora-dev-cluster --desired-status STOPPED --query 'taskArns[0]' --output text) \
+  --query 'tasks[0].stoppedReason'
+```
+
+### Database Connection Issues
+```bash
+# Verify security group allows ECS
+aws ec2 describe-security-groups \
+  --group-ids $(terraform output -raw rds_security_group_id) \
+  --query 'SecurityGroups[0].IpPermissions'
+```
+
+### Container Logs
+```bash
 aws logs tail /ecs/nexora-dev/backend --follow
-
-# Via AWS Console
-# CloudWatch → Log groups → /ecs/nexora-dev/backend
 ```
 
-### SSH into Container (ECS Exec)
-
+### Health Check Failures
 ```bash
-# Enable ECS Exec on service first
-aws ecs update-service \
-  --cluster nexora-dev-cluster \
-  --service nexora-dev-backend \
-  --enable-execute-command
-
-# Execute command
-aws ecs execute-command \
-  --cluster nexora-dev-cluster \
-  --task <task-id> \
-  --container backend \
-  --interactive \
-  --command "/bin/sh"
-```
-
-### Database Connection
-
-```bash
-# Get RDS endpoint
-terraform output rds_endpoint
-
-# Connect via bastion or ECS Exec
-psql -h <rds-endpoint> -U nexora_admin -d nexora_db
-```
-
-### Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| ECS task fails to start | Check CloudWatch logs, verify secrets access |
-| ALB health check failing | Verify security groups, check /health endpoint |
-| Database connection refused | Check security group rules, verify DATABASE_URL |
-| Redis connection timeout | Verify Redis auth token, check security groups |
-
----
-
-## Cleanup
-
-**WARNING: This will destroy all resources including data!**
-
-```bash
-cd infrastructure/aws/terraform
-
-# Destroy all resources
-terraform destroy
-
-# Confirm with 'yes'
+# Check target group health
+aws elbv2 describe-target-health \
+  --target-group-arn $(terraform output -raw backend_target_group_arn)
 ```
 
 ---
 
-## Files Created
+## Security Checklist
+
+- [x] All data encrypted at rest (KMS)
+- [x] All traffic encrypted in transit (TLS 1.3)
+- [x] Secrets in AWS Secrets Manager
+- [x] WAF enabled with rate limiting
+- [x] Private subnets for all services
+- [x] Non-root container users
+- [x] Security group least privilege
+- [x] VPC Flow Logs (prod)
+- [x] ECR image scanning enabled
+- [x] RDS deletion protection (prod)
+
+---
+
+## Destroy Infrastructure
+
+**WARNING: This will delete ALL resources including databases!**
+
+```bash
+# Remove deletion protection first (prod only)
+aws rds modify-db-instance \
+  --db-instance-identifier nexora-prod-postgres \
+  --no-deletion-protection
+
+# Destroy
+terraform destroy -var-file=envs/dev.tfvars
+```
+
+---
+
+## File Structure
 
 ```
 infrastructure/aws/
 ├── terraform/
-│   ├── main.tf                    # Provider, VPC, Security Groups
-│   ├── variables.tf               # Input variables
-│   ├── outputs.tf                 # Output values
-│   ├── rds.tf                     # PostgreSQL database
-│   ├── elasticache.tf             # Redis cache
-│   ├── ecs.tf                     # ECS cluster and services
-│   ├── ecr.tf                     # Container registries
-│   ├── alb.tf                     # Load balancer
-│   ├── kms.tf                     # Encryption keys
-│   ├── secrets.tf                 # Secrets Manager
-│   ├── terraform.tfvars.example   # Dev config example
-│   └── terraform.tfvars.prod.example # Prod config example
+│   ├── versions.tf      # Provider versions, backend
+│   ├── variables.tf     # Input variables
+│   ├── locals.tf        # Local values
+│   ├── vpc.tf           # VPC, subnets, NAT, endpoints
+│   ├── security-groups.tf
+│   ├── kms.tf           # Encryption keys
+│   ├── secrets.tf       # Secrets Manager
+│   ├── rds.tf           # PostgreSQL database
+│   ├── elasticache.tf   # Redis cache
+│   ├── ecr.tf           # Container registries
+│   ├── iam.tf           # IAM roles and policies
+│   ├── alb.tf           # Load balancer, SSL
+│   ├── waf.tf           # Web Application Firewall
+│   ├── ecs.tf           # ECS cluster, services, tasks
+│   ├── autoscaling.tf   # Auto-scaling policies
+│   ├── monitoring.tf    # CloudWatch alarms
+│   ├── outputs.tf       # Output values
+│   └── envs/
+│       ├── dev.tfvars
+│       ├── staging.tfvars
+│       └── prod.tfvars
 ├── docker/
-│   ├── Dockerfile.frontend        # Next.js frontend
-│   ├── Dockerfile.backend         # Node.js backend
-│   ├── Dockerfile.ml-service      # FastAPI ML service
-│   └── Dockerfile.malgenx         # FastAPI MalGenX service
+│   ├── Dockerfile.frontend
+│   ├── Dockerfile.backend
+│   ├── Dockerfile.ml-service
+│   └── Dockerfile.malgenx
 ├── scripts/
-│   ├── deploy.sh                  # Bash deployment script
-│   ├── deploy.ps1                 # PowerShell deployment script
-│   └── setup-infrastructure.sh    # Infrastructure setup
-└── AWS_DEPLOYMENT_GUIDE.md        # This guide
-
-.github/workflows/
-└── aws-deploy.yml                 # CI/CD pipeline
+│   ├── deploy.sh
+│   ├── setup-remote-state.sh
+│   └── create-github-secrets.sh
+└── AWS_DEPLOYMENT_GUIDE.md
 ```
 
 ---
@@ -455,6 +406,7 @@ infrastructure/aws/
 ## Support
 
 For issues:
-1. Check CloudWatch Logs
-2. Review Terraform state: `terraform state list`
-3. Verify AWS credentials: `aws sts get-caller-identity`
+1. Check CloudWatch logs
+2. Review ECS task stopped reasons
+3. Verify security group rules
+4. Check Secrets Manager values

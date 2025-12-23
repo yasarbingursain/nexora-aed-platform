@@ -1,6 +1,7 @@
 import { redisRateLimit } from '@/config/redis';
 import { logger } from '@/utils/logger';
 import { prisma } from '@/config/database';
+import { emailService } from './email.service';
 
 /**
  * SECURITY FIX: CWE-307 - Improper Restriction of Excessive Authentication Attempts
@@ -181,6 +182,32 @@ export class AccountLockoutService {
       type,
       lockoutDuration,
     });
+
+    // Send email notification about account lockout
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { fullName: true },
+      });
+
+      if (user && emailService.isConfigured()) {
+        const unlockTime = new Date(Date.now() + lockoutDuration * 1000);
+        await emailService.sendAccountLockout(
+          email,
+          user.fullName || 'User',
+          email,
+          `Exceeded ${this.MAX_ATTEMPTS} failed login attempts`,
+          unlockTime.toLocaleString(),
+          this.MAX_ATTEMPTS,
+          ip
+        );
+      }
+    } catch (error) {
+      logger.error('Failed to send account lockout email', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        email,
+      });
+    }
   }
 
   /**

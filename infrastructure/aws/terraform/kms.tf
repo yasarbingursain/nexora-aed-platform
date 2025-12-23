@@ -1,11 +1,15 @@
 # =============================================================================
-# KMS Keys for Encryption
+# Nexora AWS Infrastructure - KMS Encryption Keys
+# =============================================================================
+# Customer-managed keys for encryption at rest
 # =============================================================================
 
+# Primary KMS key for all encryption
 resource "aws_kms_key" "main" {
-  description             = "KMS key for ${var.project_name} ${var.environment}"
-  deletion_window_in_days = 7
+  description             = "KMS key for ${local.name_prefix} encryption"
+  deletion_window_in_days = local.is_prod ? 30 : 7
   enable_key_rotation     = true
+  multi_region            = false
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -20,44 +24,58 @@ resource "aws_kms_key" "main" {
         Resource = "*"
       },
       {
-        Sid    = "Allow RDS to use the key"
+        Sid    = "Allow ECS Task Execution Role"
         Effect = "Allow"
         Principal = {
-          Service = "rds.amazonaws.com"
+          AWS = aws_iam_role.ecs_execution.arn
         }
         Action = [
-          "kms:Encrypt",
           "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:GenerateDataKey*"
         ]
         Resource = "*"
       },
       {
-        Sid    = "Allow ECS to use the key"
+        Sid    = "Allow ECS Task Role"
         Effect = "Allow"
         Principal = {
-          Service = "ecs.amazonaws.com"
+          AWS = aws_iam_role.ecs_task.arn
         }
         Action = [
-          "kms:Encrypt",
           "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:GenerateDataKey*"
         ]
         Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt*",
+          "kms:Decrypt*",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:Describe*"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"
+          }
+        }
       }
     ]
   })
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-kms"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-kms-key"
+  })
 }
 
 resource "aws_kms_alias" "main" {
-  name          = "alias/${var.project_name}-${var.environment}"
+  name          = "alias/${local.name_prefix}-key"
   target_key_id = aws_kms_key.main.key_id
 }

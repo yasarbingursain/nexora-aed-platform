@@ -891,6 +891,33 @@ model MLPrediction {
   @@map("ml_predictions")
 }
 
+// Notifications - Persistent notification queue for users
+model Notification {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  organizationId String    @map("organization_id")
+  type           String    // security_alert, api_key_rotation, password_change, account_lockout, workflow_approval, system_notification
+  severity       String    // low, medium, high, critical
+  title          String
+  message        String    @db.Text
+  data           String?   @db.Text // JSON data
+  actionUrl      String?   @map("action_url")
+  read           Boolean   @default(false)
+  readAt         DateTime? @map("read_at")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@index([expiresAt])
+  @@index([severity])
+  @@map("notifications")
+}
+
 // Forensic Timeline Events - Aggregated timeline for investigations
 model ForensicTimelineEvent {
   id            String   @id @default(cuid())

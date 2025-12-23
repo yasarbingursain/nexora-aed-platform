@@ -13,7 +13,7 @@ export const registerSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must be less than 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
       'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
   
   fullName: z.string()
@@ -42,11 +42,18 @@ export const refreshTokenSchema = z.object({
 });
 
 export const mfaSetupSchema = z.object({
-  secret: z.string()
-    .min(1, 'MFA secret is required'),
-});
+}).strict();
 
 export const mfaVerifySchema = z.object({
+  token: z.string()
+    .regex(/^\d{6}$/, 'MFA token must be 6 digits'),
+});
+
+export const mfaDisableSchema = z.object({
+  password: z.string()
+    .min(1, 'Password is required')
+    .max(128, 'Password must be less than 128 characters'),
+
   token: z.string()
     .regex(/^\d{6}$/, 'MFA token must be 6 digits'),
 });
@@ -58,7 +65,7 @@ export const changePasswordSchema = z.object({
   newPassword: z.string()
     .min(8, 'New password must be at least 8 characters')
     .max(128, 'New password must be less than 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
       'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
 });
 
@@ -75,6 +82,6 @@ export const resetPasswordSchema = z.object({
   newPassword: z.string()
     .min(8, 'New password must be at least 8 characters')
     .max(128, 'New password must be less than 128 characters')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, 
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
       'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
 });

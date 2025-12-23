@@ -1,5 +1,6 @@
 import { identityRepository } from '@/repositories/identities.repository';
 import { logger } from '@/utils/logger';
+import { encryptionService } from '@/utils/encryption.service';
 import { Prisma } from '@prisma/client';
 import type {
   CreateIdentityInput,
@@ -95,6 +96,16 @@ export class IdentityService {
    * Create new identity
    */
   async create(organizationId: string, data: CreateIdentityInput) {
+    const credentials = data.credentials
+      ? {
+          ...data.credentials,
+          value: data.credentials.encrypted
+            ? data.credentials.value
+            : encryptionService.encrypt(data.credentials.value),
+          encrypted: true,
+        }
+      : {};
+
     // Prepare identity data
     const identityData: Prisma.IdentityCreateInput = {
       name: data.name,
@@ -104,7 +115,7 @@ export class IdentityService {
       owner: data.owner || null,
       description: data.description || null,
       tags: data.tags?.join(',') || '',
-      credentials: JSON.stringify(data.credentials || {}),
+      credentials: JSON.stringify(credentials),
       metadata: JSON.stringify(data.metadata || {}),
       rotationInterval: data.rotationInterval || null,
       organization: {

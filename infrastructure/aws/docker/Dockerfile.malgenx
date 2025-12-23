@@ -1,51 +1,59 @@
 # =============================================================================
 # Nexora MalGenX Service - Production Dockerfile
 # =============================================================================
-# FastAPI threat intelligence service
+# Multi-stage build for optimized Python/FastAPI production image
 # =============================================================================
 
 FROM python:3.11-slim AS base
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Build stage
+FROM base AS builder
+
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    libpq-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
-FROM base AS builder
-COPY backend-malgenx/requirements.txt .
+# Install Python dependencies
+COPY malgenx-service/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Production image
 FROM base AS runner
 
-# Create non-root user
-RUN groupadd --system --gid 1001 python && \
-    useradd --system --uid 1001 --gid python malgenx
+WORKDIR /app
 
-# Copy installed packages from builder
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user
+RUN groupadd --system --gid 1001 malgenx
+RUN useradd --system --uid 1001 --gid malgenx malgenx
+
+# Copy Python packages from builder
 COPY --from=builder /root/.local /home/malgenx/.local
-ENV PATH=/home/malgenx/.local/bin:$PATH
 
 # Copy application code
-COPY backend-malgenx/app ./app
+COPY malgenx-service/ .
 
-# Change ownership
-RUN chown -R malgenx:python /app
+# Set ownership
+RUN chown -R malgenx:malgenx /app
 
 USER malgenx
 
+ENV PATH=/home/malgenx/.local/bin:$PATH
+
 EXPOSE 8001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8001/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8001/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

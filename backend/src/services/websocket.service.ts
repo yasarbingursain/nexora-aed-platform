@@ -5,6 +5,7 @@ import { env } from '@/config/env';
 import { logger } from '@/utils/logger';
 import { Kafka, Consumer } from 'kafkajs';
 import { PrismaClient } from '@prisma/client';
+import { kafkaHealthService } from './kafka-health.service';
 
 const prisma = new PrismaClient();
 
@@ -262,9 +263,15 @@ export const initializeThreatFeed = async (io: SocketIOServer): Promise<Consumer
       fromBeginning: false,
     });
 
+    // Register consumer with health service
+    kafkaHealthService.registerConsumer('websocket-threat-feed', consumer, ['threat-intel.ingested']);
+
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
         try {
+          // Record message received for health monitoring
+          kafkaHealthService.recordMessageReceived('websocket-threat-feed');
+          
           const threatEvent = JSON.parse(message.value!.toString());
           
           // CRITICAL: Maintain multi-tenant isolation

@@ -10,6 +10,7 @@ import {
   refreshTokenSchema,
   mfaSetupSchema,
   mfaVerifySchema,
+  mfaDisableSchema,
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -32,6 +33,7 @@ router.post('/login',
 
 // SPRINT 2: Token rotation for replay attack prevention
 router.post('/refresh', 
+  authRateLimit,
   validate(refreshTokenSchema),
   TokenRotationService.refreshWithRotation
 );
@@ -61,14 +63,20 @@ router.post('/change-password',
 );
 
 // MFA routes
-router.post('/mfa/setup', AuthController.setupMfa);
+router.post('/mfa/setup',
+  validate(mfaSetupSchema),
+  AuthController.setupMfa
+);
 
 router.post('/mfa/verify',
   validate(mfaVerifySchema),
   AuthController.verifyMfa
 );
 
-router.post('/mfa/disable', AuthController.disableMfa);
+router.post('/mfa/disable',
+  validate(mfaDisableSchema),
+  AuthController.disableMfa
+);
 
 // Admin only routes
 router.get('/users',

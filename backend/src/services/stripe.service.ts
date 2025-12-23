@@ -13,6 +13,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
+import { redis } from '@/config/redis';
 
 // Initialize Stripe with API version (graceful handling for development without real keys)
 const stripeKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder';
@@ -171,16 +172,21 @@ export class StripeService {
   }
 
   /**
-   * Handle Stripe webhook events
+   * Handle Stripe webhook events with idempotency
+   * Prevents duplicate processing of the same event
    */
   async handleWebhook(
     payload: Buffer,
     signature: string
-  ): Promise<{ received: boolean; type: string }> {
+  ): Promise<{ received: boolean; type: string; duplicate?: boolean }> {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     
     if (!webhookSecret) {
       throw new Error('Stripe webhook secret not configured');
+    }
+
+    if (!stripe) {
+      throw new Error('Stripe not configured');
     }
 
     let event: Stripe.Event;
@@ -194,32 +200,56 @@ export class StripeService {
       throw new Error('Webhook signature verification failed');
     }
 
-    logger.info('Webhook received', { type: event.type });
+    // IDEMPOTENCY: Check if we've already processed this event
+    const idempotencyKey = `stripe:webhook:${event.id}`;
+    const alreadyProcessed = await redis.get(idempotencyKey);
+    
+    if (alreadyProcessed) {
+      logger.info('Duplicate webhook event ignored', { 
+        eventId: event.id, 
+        type: event.type 
+      });
+      return { received: true, type: event.type, duplicate: true };
+    }
 
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await this.handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
-        break;
+    // Mark as processing (with 24-hour TTL to prevent reprocessing)
+    await redis.setex(idempotencyKey, 86400, 'processing');
 
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        await this.handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
-        break;
+    logger.info('Webhook received', { type: event.type, eventId: event.id });
 
-      case 'customer.subscription.deleted':
-        await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await this.handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
+          break;
 
-      case 'invoice.payment_succeeded':
-        await this.handlePaymentSucceeded(event.data.object as Stripe.Invoice);
-        break;
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+          await this.handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
+          break;
 
-      case 'invoice.payment_failed':
-        await this.handlePaymentFailed(event.data.object as Stripe.Invoice);
-        break;
+        case 'customer.subscription.deleted':
+          await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+          break;
 
-      default:
-        logger.debug('Unhandled webhook event', { type: event.type });
+        case 'invoice.payment_succeeded':
+          await this.handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+          break;
+
+        case 'invoice.payment_failed':
+          await this.handlePaymentFailed(event.data.object as Stripe.Invoice);
+          break;
+
+        default:
+          logger.debug('Unhandled webhook event', { type: event.type });
+      }
+
+      // Mark as completed
+      await redis.setex(idempotencyKey, 86400, 'completed');
+    } catch (error) {
+      // Mark as failed but still prevent immediate retry
+      await redis.setex(idempotencyKey, 300, 'failed'); // 5 min retry window
+      throw error;
     }
 
     return { received: true, type: event.type };

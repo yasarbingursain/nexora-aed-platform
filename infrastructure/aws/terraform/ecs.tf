@@ -1,25 +1,36 @@
 # =============================================================================
-# ECS Cluster and Services
+# Nexora AWS Infrastructure - ECS Fargate
 # =============================================================================
-# Using Fargate for serverless container management
-# Dev: Minimal resources, Prod: Scale up and add auto-scaling
+# Serverless container orchestration with auto-scaling
 # =============================================================================
 
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
-  name = "${var.project_name}-${var.environment}-cluster"
+  name = "${local.name_prefix}-cluster"
 
   setting {
     name  = "containerInsights"
-    value = var.environment == "dev" ? "disabled" : "enabled"
+    value = var.enable_container_insights ? "enabled" : "disabled"
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-cluster"
+  configuration {
+    execute_command_configuration {
+      kms_key_id = aws_kms_key.main.arn
+      logging    = "OVERRIDE"
+
+      log_configuration {
+        cloud_watch_encryption_enabled = true
+        cloud_watch_log_group_name     = aws_cloudwatch_log_group.ecs_exec.name
+      }
+    }
   }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-cluster"
+  })
 }
 
-# ECS Cluster Capacity Providers
+# Cluster Capacity Providers
 resource "aws_ecs_cluster_capacity_providers" "main" {
   cluster_name = aws_ecs_cluster.main.name
 
@@ -28,120 +39,18 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
   default_capacity_provider_strategy {
     base              = 1
     weight            = 100
-    capacity_provider = var.environment == "dev" ? "FARGATE_SPOT" : "FARGATE"
+    capacity_provider = var.ecs_capacity_provider
   }
 }
 
-# -----------------------------------------------------------------------------
-# IAM Roles
-# -----------------------------------------------------------------------------
+# ECS Exec Log Group
+resource "aws_cloudwatch_log_group" "ecs_exec" {
+  name              = "/ecs/${local.name_prefix}/exec"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
 
-# ECS Task Execution Role
-resource "aws_iam_role" "ecs_execution" {
-  name = "${var.project_name}-${var.environment}-ecs-execution"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_execution" {
-  role       = aws_iam_role.ecs_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-resource "aws_iam_role_policy" "ecs_execution_secrets" {
-  name = "${var.project_name}-${var.environment}-ecs-secrets"
-  role = aws_iam_role.ecs_execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = [
-          aws_secretsmanager_secret.db_credentials.arn,
-          aws_secretsmanager_secret.redis_credentials.arn,
-          aws_secretsmanager_secret.jwt_secrets.arn,
-          aws_secretsmanager_secret.app_secrets.arn
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt"
-        ]
-        Resource = [aws_kms_key.main.arn]
-      }
-    ]
-  })
-}
-
-# ECS Task Role
-resource "aws_iam_role" "ecs_task" {
-  name = "${var.project_name}-${var.environment}-ecs-task"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "ecs_task" {
-  name = "${var.project_name}-${var.environment}-ecs-task-policy"
-  role = aws_iam_role.ecs_task.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = [
-          aws_secretsmanager_secret.db_credentials.arn,
-          aws_secretsmanager_secret.redis_credentials.arn,
-          aws_secretsmanager_secret.jwt_secrets.arn,
-          aws_secretsmanager_secret.app_secrets.arn
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "kms:Decrypt"
-        ]
-        Resource = [aws_kms_key.main.arn]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "*"
-      }
-    ]
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ecs-exec-logs"
   })
 }
 
@@ -150,48 +59,65 @@ resource "aws_iam_role_policy" "ecs_task" {
 # -----------------------------------------------------------------------------
 
 resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${var.project_name}-${var.environment}/frontend"
-  retention_in_days = var.environment == "dev" ? 7 : 30
+  name              = "/ecs/${local.name_prefix}/frontend"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-frontend-logs"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-frontend-logs"
+  })
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
-  name              = "/ecs/${var.project_name}-${var.environment}/backend"
-  retention_in_days = var.environment == "dev" ? 7 : 30
+  name              = "/ecs/${local.name_prefix}/backend"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-backend-logs"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-backend-logs"
+  })
 }
 
 resource "aws_cloudwatch_log_group" "ml_service" {
-  name              = "/ecs/${var.project_name}-${var.environment}/ml-service"
-  retention_in_days = var.environment == "dev" ? 7 : 30
+  name              = "/ecs/${local.name_prefix}/ml-service"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-ml-service-logs"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ml-service-logs"
+  })
 }
 
 resource "aws_cloudwatch_log_group" "malgenx" {
-  name              = "/ecs/${var.project_name}-${var.environment}/malgenx"
-  retention_in_days = var.environment == "dev" ? 7 : 30
+  name              = "/ecs/${local.name_prefix}/malgenx"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.main.arn
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-malgenx-logs"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-malgenx-logs"
+  })
 }
 
 # -----------------------------------------------------------------------------
-# Task Definitions
+# Service Discovery Namespace
 # -----------------------------------------------------------------------------
 
-# Frontend Task Definition
+resource "aws_service_discovery_private_dns_namespace" "main" {
+  name        = "${local.name_prefix}.local"
+  description = "Service discovery for ${var.project_name}"
+  vpc         = module.vpc.vpc_id
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-namespace"
+  })
+}
+
+# -----------------------------------------------------------------------------
+# Frontend Service
+# -----------------------------------------------------------------------------
+
 resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${var.project_name}-${var.environment}-frontend"
+  family                   = "${local.name_prefix}-frontend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.frontend_cpu
@@ -207,7 +133,7 @@ resource "aws_ecs_task_definition" "frontend" {
 
       portMappings = [
         {
-          containerPort = 3000
+          containerPort = local.ports.frontend
           protocol      = "tcp"
         }
       ]
@@ -215,7 +141,7 @@ resource "aws_ecs_task_definition" "frontend" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "NEXT_PUBLIC_ENVIRONMENT", value = var.environment },
-        { name = "NEXT_PUBLIC_API_URL", value = "https://api.${var.domain_name != "" ? var.domain_name : "localhost"}" }
+        { name = "NEXT_PUBLIC_API_URL", value = var.domain_name != "" ? "https://api.${var.domain_name}" : "https://${aws_lb.main.dns_name}" }
       ]
 
       logConfiguration = {
@@ -228,7 +154,7 @@ resource "aws_ecs_task_definition" "frontend" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:3000/api/healthz || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.frontend}/api/healthz || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -237,14 +163,59 @@ resource "aws_ecs_task_definition" "frontend" {
     }
   ])
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-frontend"
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-frontend"
+  })
+}
+
+resource "aws_ecs_service" "frontend" {
+  name                   = "${local.name_prefix}-frontend"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.frontend.arn
+  desired_count          = var.frontend_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
+  platform_version       = "LATEST"
+
+  network_configuration {
+    subnets          = module.vpc.private_subnets
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend.arn
+    container_name   = "frontend"
+    container_port   = local.ports.frontend
+  }
+
+  deployment_configuration {
+    maximum_percent         = 200
+    minimum_healthy_percent = 100
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  depends_on = [aws_lb_listener.https]
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-frontend"
+  })
+
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
   }
 }
 
-# Backend Task Definition
+# -----------------------------------------------------------------------------
+# Backend Service
+# -----------------------------------------------------------------------------
+
 resource "aws_ecs_task_definition" "backend" {
-  family                   = "${var.project_name}-${var.environment}-backend"
+  family                   = "${local.name_prefix}-backend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.backend_cpu
@@ -260,19 +231,19 @@ resource "aws_ecs_task_definition" "backend" {
 
       portMappings = [
         {
-          containerPort = 8080
+          containerPort = local.ports.backend
           protocol      = "tcp"
         }
       ]
 
       environment = [
         { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = "8080" },
+        { name = "PORT", value = tostring(local.ports.backend) },
         { name = "API_VERSION", value = "v1" },
         { name = "ENABLE_WEBSOCKETS", value = "true" },
         { name = "ENABLE_METRICS", value = "true" },
-        { name = "LOG_LEVEL", value = "info" },
-        { name = "FRONTEND_URL", value = "https://${var.domain_name != "" ? var.domain_name : "localhost"}" }
+        { name = "LOG_LEVEL", value = local.is_prod ? "info" : "debug" },
+        { name = "FRONTEND_URL", value = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_lb.main.dns_name}" }
       ]
 
       secrets = [
@@ -291,6 +262,18 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name      = "JWT_REFRESH_SECRET"
           valueFrom = "${aws_secretsmanager_secret.jwt_secrets.arn}:jwt_refresh_secret::"
+        },
+        {
+          name      = "ENCRYPTION_KEY"
+          valueFrom = "${aws_secretsmanager_secret.jwt_secrets.arn}:encryption_key::"
+        },
+        {
+          name      = "STRIPE_SECRET_KEY"
+          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:stripe_secret_key::"
+        },
+        {
+          name      = "STRIPE_WEBHOOK_SECRET"
+          valueFrom = "${aws_secretsmanager_secret.app_secrets.arn}:stripe_webhook_secret::"
         }
       ]
 
@@ -304,7 +287,7 @@ resource "aws_ecs_task_definition" "backend" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.backend}/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -313,14 +296,78 @@ resource "aws_ecs_task_definition" "backend" {
     }
   ])
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-backend"
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-backend"
+  })
+}
+
+resource "aws_ecs_service" "backend" {
+  name                   = "${local.name_prefix}-backend"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.backend.arn
+  desired_count          = var.backend_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
+  platform_version       = "LATEST"
+
+  network_configuration {
+    subnets          = module.vpc.private_subnets
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.backend.arn
+    container_name   = "backend"
+    container_port   = local.ports.backend
+  }
+
+  deployment_configuration {
+    maximum_percent         = 200
+    minimum_healthy_percent = 100
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  depends_on = [aws_lb_listener.https]
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-backend"
+  })
+
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
   }
 }
 
-# ML Service Task Definition
+# -----------------------------------------------------------------------------
+# ML Service
+# -----------------------------------------------------------------------------
+
+resource "aws_service_discovery_service" "ml_service" {
+  name = "ml-service"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
 resource "aws_ecs_task_definition" "ml_service" {
-  family                   = "${var.project_name}-${var.environment}-ml-service"
+  family                   = "${local.name_prefix}-ml-service"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.ml_cpu
@@ -336,7 +383,7 @@ resource "aws_ecs_task_definition" "ml_service" {
 
       portMappings = [
         {
-          containerPort = 8000
+          containerPort = local.ports.ml
           protocol      = "tcp"
         }
       ]
@@ -355,7 +402,7 @@ resource "aws_ecs_task_definition" "ml_service" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.ml}/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -364,14 +411,74 @@ resource "aws_ecs_task_definition" "ml_service" {
     }
   ])
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-ml-service"
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ml-service"
+  })
+}
+
+resource "aws_ecs_service" "ml_service" {
+  name                   = "${local.name_prefix}-ml-service"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.ml_service.arn
+  desired_count          = var.ml_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
+  platform_version       = "LATEST"
+
+  network_configuration {
+    subnets          = module.vpc.private_subnets
+    security_groups  = [aws_security_group.ecs_tasks.id]
+    assign_public_ip = false
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.ml_service.arn
+  }
+
+  deployment_configuration {
+    maximum_percent         = 200
+    minimum_healthy_percent = 100
+  }
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-ml-service"
+  })
+
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
   }
 }
 
-# MalGenX Service Task Definition
+# -----------------------------------------------------------------------------
+# MalGenX Service
+# -----------------------------------------------------------------------------
+
+resource "aws_service_discovery_service" "malgenx" {
+  name = "malgenx"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
 resource "aws_ecs_task_definition" "malgenx" {
-  family                   = "${var.project_name}-${var.environment}-malgenx"
+  family                   = "${local.name_prefix}-malgenx"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.ml_cpu
@@ -387,7 +494,7 @@ resource "aws_ecs_task_definition" "malgenx" {
 
       portMappings = [
         {
-          containerPort = 8001
+          containerPort = local.ports.malgenx
           protocol      = "tcp"
         }
       ]
@@ -417,7 +524,7 @@ resource "aws_ecs_task_definition" "malgenx" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.malgenx}/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -426,129 +533,19 @@ resource "aws_ecs_task_definition" "malgenx" {
     }
   ])
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-malgenx"
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-malgenx"
+  })
 }
 
-# -----------------------------------------------------------------------------
-# ECS Services
-# -----------------------------------------------------------------------------
-
-# Frontend Service
-resource "aws_ecs_service" "frontend" {
-  name            = "${var.project_name}-${var.environment}-frontend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.frontend_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = module.vpc.private_subnets
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.frontend.arn
-    container_name   = "frontend"
-    container_port   = 3000
-  }
-
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 100
-  }
-
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
-  }
-
-  depends_on = [aws_lb_listener.https, aws_lb_listener.http]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-frontend"
-  }
-}
-
-# Backend Service
-resource "aws_ecs_service" "backend" {
-  name            = "${var.project_name}-${var.environment}-backend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = var.backend_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = module.vpc.private_subnets
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.backend.arn
-    container_name   = "backend"
-    container_port   = 8080
-  }
-
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 100
-  }
-
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
-  }
-
-  depends_on = [aws_lb_listener.https, aws_lb_listener.http]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-backend"
-  }
-}
-
-# ML Service
-resource "aws_ecs_service" "ml_service" {
-  name            = "${var.project_name}-${var.environment}-ml-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.ml_service.arn
-  desired_count   = var.ml_desired_count
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = module.vpc.private_subnets
-    security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
-  }
-
-  service_registries {
-    registry_arn = aws_service_discovery_service.ml_service.arn
-  }
-
-  deployment_configuration {
-    maximum_percent         = 200
-    minimum_healthy_percent = 100
-  }
-
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
-  }
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-ml-service"
-  }
-}
-
-# MalGenX Service
 resource "aws_ecs_service" "malgenx" {
-  name            = "${var.project_name}-${var.environment}-malgenx"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.malgenx.arn
-  desired_count   = var.ml_desired_count
-  launch_type     = "FARGATE"
+  name                   = "${local.name_prefix}-malgenx"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.malgenx.arn
+  desired_count          = var.ml_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = true
+  platform_version       = "LATEST"
 
   network_configuration {
     subnets          = module.vpc.private_subnets
@@ -570,59 +567,11 @@ resource "aws_ecs_service" "malgenx" {
     rollback = true
   }
 
-  tags = {
-    Name = "${var.project_name}-${var.environment}-malgenx"
-  }
-}
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-malgenx"
+  })
 
-# -----------------------------------------------------------------------------
-# Service Discovery (for internal service-to-service communication)
-# -----------------------------------------------------------------------------
-
-resource "aws_service_discovery_private_dns_namespace" "main" {
-  name        = "${var.project_name}.${var.environment}.local"
-  description = "Service discovery namespace for ${var.project_name}"
-  vpc         = module.vpc.vpc_id
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-namespace"
-  }
-}
-
-resource "aws_service_discovery_service" "ml_service" {
-  name = "ml-service"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
-  }
-}
-
-resource "aws_service_discovery_service" "malgenx" {
-  name = "malgenx"
-
-  dns_config {
-    namespace_id = aws_service_discovery_private_dns_namespace.main.id
-
-    dns_records {
-      ttl  = 10
-      type = "A"
-    }
-
-    routing_policy = "MULTIVALUE"
-  }
-
-  health_check_custom_config {
-    failure_threshold = 1
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
   }
 }

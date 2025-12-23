@@ -11,20 +11,22 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files from backend directory
 COPY backend/package.json backend/package-lock.json* ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
-# Rebuild the source code only when needed
+# Build stage
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+
+COPY backend/package.json backend/package-lock.json* ./
+RUN npm ci
+
 COPY backend/ .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
+# Build TypeScript
 RUN npm run build
 
 # Production image
@@ -33,15 +35,21 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install security updates
+RUN apk update && apk upgrade --no-cache
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nexora
 
+# Copy production dependencies
+COPY --from=deps /app/node_modules ./node_modules
+
 # Copy built application
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Create logs directory
 RUN mkdir -p logs && chown nexora:nodejs logs
@@ -52,8 +60,7 @@ EXPOSE 8080
 
 ENV PORT=8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 CMD ["node", "dist/server.js"]

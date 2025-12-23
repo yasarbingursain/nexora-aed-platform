@@ -58,6 +58,20 @@ import billingRoutes from '@/routes/billing.routes';
 // SIEM Integration Routes
 import siemRoutes from '@/routes/siem.routes';
 
+// Health Check Routes
+import healthRoutes from '@/routes/health.routes';
+
+// Notification Routes
+import notificationRoutes from '@/routes/notifications.routes';
+
+// Subscription Middleware
+import { checkSubscription } from '@/middleware/subscription.middleware';
+
+// Email and Notification Services
+import { emailService } from '@/services/email.service';
+import { notificationQueueService } from '@/services/notification-queue.service';
+import { kafkaHealthService } from '@/services/kafka-health.service';
+
 // ----------------------------------------------------
 // FIX 1: DECLARE SHARED VARS BEFORE THEY ARE USED
 // ----------------------------------------------------
@@ -88,6 +102,10 @@ app.use(cors({
 // Compression
 app.use(compressionMiddleware);
 
+// IMPORTANT: Stripe webhook needs raw body BEFORE json parsing
+// This must come before express.json() middleware
+app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
+
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -107,6 +125,10 @@ app.use(auditMiddleware);
 // RLS Enforcement
 app.use(enforceRowLevelSecurity);
 
+// Subscription Enforcement (trial expiration, payment status)
+// Applied after auth to check subscription status for authenticated requests
+app.use(checkSubscription);
+
 // ----------------------------------------------------
 // FIX 2: TYPE THE LOGGING MIDDLEWARE PARAMS
 // ----------------------------------------------------
@@ -125,8 +147,11 @@ app.use((
   next();
 });
 
-// Health
-app.get('/health', healthCheckHandler);
+// Health Check Routes (detailed)
+app.use('/health', healthRoutes);
+
+// Legacy health endpoint
+app.get('/health-legacy', healthCheckHandler);
 
 // API Routes
 app.use(`/api/${env.API_VERSION}/auth`, authRoutes);
@@ -176,6 +201,9 @@ app.use(`/api/${env.API_VERSION}/billing`, billingRoutes);
 
 // SIEM Integration
 app.use(`/api/${env.API_VERSION}/siem`, siemRoutes);
+
+// Notifications
+app.use(`/api/${env.API_VERSION}/notifications`, notificationRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);
@@ -231,6 +259,10 @@ app.use((
 if (env.ENABLE_WEBSOCKETS) {
   io = setupWebSocket(httpServer);
   logger.info('WebSocket server initialized');
+  
+  // Attach WebSocket server to notification queue service
+  notificationQueueService.setWebSocketServer(io);
+  logger.info('Notification queue service connected to WebSocket');
 }
 
 // ----------------------------------------------------
@@ -277,6 +309,14 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
     }
   }
 
+  // Shutdown Kafka health service
+  try {
+    await kafkaHealthService.shutdown();
+    logger.info('Kafka health service shutdown');
+  } catch (error) {
+    logger.error('Kafka health shutdown error:', error);
+  }
+
   process.exit(0);
 };
 
@@ -300,6 +340,21 @@ process.on(
 // START METRICS
 // ----------------------------------------------------
 startMetricsCollection();
+
+// ----------------------------------------------------
+// KAFKA HEALTH MONITORING
+// ----------------------------------------------------
+if (process.env.KAFKA_BROKERS) {
+  kafkaHealthService.startHealthChecks(60000); // Check every 60 seconds
+  logger.info('✅ Kafka health monitoring started');
+}
+
+// ----------------------------------------------------
+// NOTIFICATION CLEANUP JOB
+// ----------------------------------------------------
+const notificationCleanupInterval = parseInt(process.env.NOTIFICATION_CLEANUP_INTERVAL || '60', 10);
+notificationQueueService.startCleanupJob(notificationCleanupInterval);
+logger.info('✅ Notification cleanup job started', { intervalMinutes: notificationCleanupInterval });
 
 // ----------------------------------------------------
 // OSINT ORCHESTRATOR

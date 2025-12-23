@@ -23,6 +23,9 @@ import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
 import { remediationExecutor, ActionType, ExecutionResult } from '@/services/remediation/executor.service';
 import { rollbackService } from '@/services/remediation/rollback.service';
+import { emailService } from './email.service';
+import { notificationQueueService } from './notification-queue.service';
+import { slackService } from './integrations/ticketing.service';
 import { EventEmitter } from 'events';
 
 // ============================================================================
@@ -859,24 +862,234 @@ export class WorkflowRemediationService extends EventEmitter {
   }
 
   private async notifyApprovers(execution: WorkflowExecution, step: WorkflowStep, approvalId: string): Promise<void> {
-    // In production, this would send emails/Slack messages to approvers
-    logger.info('Approval notification sent', {
-      executionId: execution.id,
-      stepId: step.id,
-      approvalId,
-      approverRoles: step.approval?.approverRoles,
-    });
+    if (!step.approval) return;
+
+    try {
+      // Get workflow details
+      const workflow = await this.getWorkflowDefinition(execution.workflowId, execution.organizationId);
+      if (!workflow) return;
+
+      // Get approvers based on roles
+      const approvers = await prisma.user.findMany({
+        where: {
+          organizationId: execution.organizationId,
+          role: { in: step.approval.approverRoles },
+        },
+        select: { id: true, email: true, fullName: true },
+      });
+
+      // Calculate expiry time
+      const expiresAt = new Date(Date.now() + step.approval.timeoutMinutes * 60 * 1000);
+      const expiresIn = `${step.approval.timeoutMinutes} minutes`;
+
+      // Generate approval URLs
+      const baseUrl = process.env.FRONTEND_URL || 'https://app.nexora.io';
+      const approveUrl = `${baseUrl}/workflows/approvals/${approvalId}/approve`;
+      const rejectUrl = `${baseUrl}/workflows/approvals/${approvalId}/reject`;
+
+      // Prepare workflow details
+      const details: Record<string, any> = {
+        'Workflow': workflow.name,
+        'Step': step.name,
+        'Triggered By': execution.triggeredBy,
+        'Organization': execution.organizationId,
+      };
+
+      if (execution.targetIdentityId) {
+        details['Target Identity'] = execution.targetIdentityId;
+      }
+      if (execution.targetThreatId) {
+        details['Related Threat'] = execution.targetThreatId;
+      }
+
+      // Determine blast radius
+      const blastRadius = step.action?.blastRadius || 'medium';
+
+      // Send email to each approver
+      for (const approver of approvers) {
+        if (emailService.isConfigured()) {
+          await emailService.sendWorkflowApproval(
+            approver.email,
+            approver.fullName || 'User',
+            workflow.name,
+            workflow.description,
+            blastRadius,
+            approveUrl,
+            rejectUrl,
+            expiresIn,
+            details
+          );
+        }
+
+        // Also queue notification in system
+        await notificationQueueService.queueNotification({
+          userId: approver.id,
+          organizationId: execution.organizationId,
+          type: 'workflow_approval',
+          severity: blastRadius === 'critical' ? 'critical' : blastRadius === 'high' ? 'high' : 'medium',
+          title: `Approval Required: ${workflow.name}`,
+          message: `${step.name} requires your approval. Expires in ${expiresIn}.`,
+          data: {
+            approvalId,
+            executionId: execution.id,
+            workflowId: execution.workflowId,
+            stepId: step.id,
+            expiresAt: expiresAt.toISOString(),
+          },
+          actionUrl: approveUrl,
+          expiresAt,
+          sendEmail: false, // Already sent via emailService
+          sendWebSocket: true,
+        });
+      }
+
+      logger.info('Approval notifications sent', {
+        executionId: execution.id,
+        stepId: step.id,
+        approvalId,
+        approverCount: approvers.length,
+      });
+    } catch (error) {
+      logger.error('Failed to send approval notifications', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        executionId: execution.id,
+        stepId: step.id,
+      });
+    }
   }
 
   private async sendNotification(execution: WorkflowExecution, type: string): Promise<void> {
-    logger.info('Workflow notification sent', {
-      executionId: execution.id,
-      type,
-    });
+    try {
+      const workflow = await this.getWorkflowDefinition(execution.workflowId, execution.organizationId);
+      if (!workflow) return;
+
+      // Get user who triggered the workflow
+      const user = await prisma.user.findUnique({
+        where: { id: execution.triggeredBy },
+        select: { email: true, fullName: true },
+      });
+
+      if (!user) return;
+
+      const baseUrl = process.env.FRONTEND_URL || 'https://app.nexora.io';
+      const actionUrl = `${baseUrl}/workflows/executions/${execution.id}`;
+
+      let title: string;
+      let message: string;
+      let severity: 'low' | 'medium' | 'high' | 'critical';
+
+      if (type === 'workflow_completed') {
+        title = `Workflow Completed: ${workflow.name}`;
+        message = `The workflow "${workflow.name}" has completed successfully.`;
+        severity = 'low';
+      } else if (type === 'workflow_failed') {
+        title = `Workflow Failed: ${workflow.name}`;
+        message = `The workflow "${workflow.name}" has failed. Error: ${execution.error || 'Unknown error'}`;
+        severity = 'high';
+      } else {
+        title = `Workflow Notification: ${workflow.name}`;
+        message = `Workflow "${workflow.name}" - ${type}`;
+        severity = 'medium';
+      }
+
+      // Send email notification
+      if (emailService.isConfigured()) {
+        await emailService.sendSecurityAlert(
+          user.email,
+          user.fullName || 'User',
+          severity,
+          title,
+          message,
+          actionUrl,
+          {
+            'Workflow': workflow.name,
+            'Execution ID': execution.id,
+            'Status': execution.status,
+            'Duration': execution.completedAt 
+              ? `${Math.round((execution.completedAt.getTime() - execution.startedAt.getTime()) / 1000)}s`
+              : 'In progress',
+          }
+        );
+      }
+
+      // Queue notification
+      await notificationQueueService.queueNotification({
+        userId: execution.triggeredBy,
+        organizationId: execution.organizationId,
+        type: 'system_notification',
+        severity,
+        title,
+        message,
+        data: {
+          executionId: execution.id,
+          workflowId: execution.workflowId,
+          status: execution.status,
+        },
+        actionUrl,
+        sendEmail: false, // Already sent
+        sendWebSocket: true,
+      });
+
+      logger.info('Workflow notification sent', {
+        executionId: execution.id,
+        type,
+        recipient: user.email,
+      });
+    } catch (error) {
+      logger.error('Failed to send workflow notification', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        executionId: execution.id,
+        type,
+      });
+    }
   }
 
   private async sendChannelNotification(channel: string, template: string, data: any): Promise<void> {
-    logger.info('Channel notification sent', { channel, template });
+    try {
+      switch (channel) {
+        case 'email':
+          if (emailService.isConfigured() && data.recipients) {
+            for (const recipient of data.recipients) {
+              await emailService.send({
+                to: recipient,
+                subject: `Nexora Workflow: ${data.execution?.workflowName || 'Notification'}`,
+                text: template,
+                html: `<p>${template}</p>`,
+                priority: 'normal',
+              });
+            }
+          }
+          break;
+
+        case 'slack':
+          if (slackService.isConfigured()) {
+            await slackService.sendMessage(template);
+          }
+          break;
+
+        case 'webhook':
+          if (process.env.WEBHOOK_URL) {
+            await fetch(process.env.WEBHOOK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                channel,
+                template,
+                data,
+                timestamp: new Date().toISOString(),
+              }),
+            });
+          }
+          break;
+      }
+
+      logger.info('Channel notification sent', { channel, template });
+    } catch (error) {
+      logger.error('Channel notification failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        channel,
+      });
+    }
   }
 
   private evaluateCondition(expression: string, context: Record<string, any>): boolean {
@@ -903,22 +1116,103 @@ export class WorkflowRemediationService extends EventEmitter {
 
   private async handleExpiredApproval(approvalId: string, approval: { executionId: string; stepId: string }): Promise<void> {
     const execution = this.activeExecutions.get(approval.executionId);
-    if (execution) {
+    if (!execution) return;
+
+    try {
       execution.status = 'failed';
       execution.error = 'Approval timeout expired';
       
+      // Get workflow and step details
+      const workflow = await this.getWorkflowDefinition(execution.workflowId, execution.organizationId);
+      const step = workflow?.steps.find(s => s.id === approval.stepId);
+
+      // Send escalation notification if configured
+      if (step?.approval?.escalationEmail && emailService.isConfigured()) {
+        await emailService.send({
+          to: step.approval.escalationEmail,
+          subject: `[ESCALATION] Approval Timeout: ${workflow?.name || 'Workflow'}`,
+          html: `
+            <h2>⚠️ Approval Request Timeout - Escalation Required</h2>
+            <p>An approval request has expired without response.</p>
+            <h3>Details:</h3>
+            <ul>
+              <li><strong>Workflow:</strong> ${workflow?.name || 'Unknown'}</li>
+              <li><strong>Step:</strong> ${step?.name || 'Unknown'}</li>
+              <li><strong>Execution ID:</strong> ${execution.id}</li>
+              <li><strong>Timeout Duration:</strong> ${step?.approval?.timeoutMinutes || 'Unknown'} minutes</li>
+              <li><strong>Original Approvers:</strong> ${step?.approval?.approverRoles?.join(', ') || 'Unknown'}</li>
+            </ul>
+            <p><strong>Action Required:</strong> The workflow has been automatically cancelled. Please review and take appropriate action.</p>
+            <p>View details: ${process.env.FRONTEND_URL || 'https://app.nexora.io'}/workflows/executions/${execution.id}</p>
+          `,
+          text: `
+            ESCALATION: Approval Request Timeout
+            
+            An approval request has expired without response.
+            
+            Workflow: ${workflow?.name || 'Unknown'}
+            Step: ${step?.name || 'Unknown'}
+            Execution ID: ${execution.id}
+            Timeout Duration: ${step?.approval?.timeoutMinutes || 'Unknown'} minutes
+            Original Approvers: ${step?.approval?.approverRoles?.join(', ') || 'Unknown'}
+            
+            The workflow has been automatically cancelled. Please review and take appropriate action.
+          `,
+          priority: 'high',
+        });
+
+        logger.info('Approval timeout escalation sent', {
+          executionId: execution.id,
+          approvalId,
+          escalationEmail: step.approval.escalationEmail,
+        });
+      }
+
+      // Notify original approvers
+      if (step?.approval) {
+        const approvers = await prisma.user.findMany({
+          where: {
+            organizationId: execution.organizationId,
+            role: { in: step.approval.approverRoles },
+          },
+          select: { id: true, email: true, fullName: true },
+        });
+
+        for (const approver of approvers) {
+          await notificationQueueService.queueNotification({
+            userId: approver.id,
+            organizationId: execution.organizationId,
+            type: 'system_notification',
+            severity: 'high',
+            title: `Approval Timeout: ${workflow?.name || 'Workflow'}`,
+            message: `Your approval request for "${step.name}" has expired. The workflow has been cancelled.`,
+            data: {
+              approvalId,
+              executionId: execution.id,
+              workflowId: execution.workflowId,
+              stepId: approval.stepId,
+            },
+            sendEmail: true,
+            sendWebSocket: true,
+          });
+        }
+      }
+
       await this.createAuditLog(execution, 'approval_expired', {
         approvalId,
         stepId: approval.stepId,
+        escalationSent: !!step?.approval?.escalationEmail,
+      });
+    } catch (error) {
+      logger.error('Failed to handle expired approval', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        executionId: execution.id,
+        approvalId,
       });
     }
-    this.pendingApprovals.delete(approvalId);
   }
 
-  private generateExecutionId(): string {
-    return `wf-exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
-
+  this.pendingApprovals.delete(approvalId);
   private generateApprovalId(): string {
     return `approval-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
