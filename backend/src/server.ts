@@ -37,7 +37,6 @@ import customerIdentitiesRoutes from '@/routes/customer.identities.routes';
 import customerAnalyticsRoutes from '@/routes/customer.analytics.routes';
 import adminRoutes from '@/routes/admin.routes';
 import osintRoutes from '@/routes/osint.routes';
-import malgenxRoutes from '@/routes/malgenx.routes';
 import threatFeedRoutes from '@/routes/threat-feed.routes';
 import nhitiRoutes from '@/routes/nhiti.routes';
 import pqcRoutes from '@/routes/pqc.routes';
@@ -63,6 +62,9 @@ import healthRoutes from '@/routes/health.routes';
 
 // Notification Routes
 import notificationRoutes from '@/routes/notifications.routes';
+
+// Compliance Frameworks Routes
+import complianceFrameworksRoutes from '@/routes/compliance-frameworks.routes';
 
 // Subscription Middleware
 import { checkSubscription } from '@/middleware/subscription.middleware';
@@ -173,9 +175,8 @@ app.use(`/api/${env.API_VERSION}/customer/analytics`, customerAnalyticsRoutes);
 // Admin
 app.use(`/api/${env.API_VERSION}/admin`, adminRoutes);
 
-// OSINT + MalGenX
+// OSINT
 app.use(`/api/${env.API_VERSION}/osint`, osintRoutes);
-app.use(`/api/${env.API_VERSION}/malgenx`, malgenxRoutes);
 
 // Threat Feed
 app.use(`/api/${env.API_VERSION}/threat-feed`, threatFeedRoutes);
@@ -204,6 +205,9 @@ app.use(`/api/${env.API_VERSION}/siem`, siemRoutes);
 
 // Notifications
 app.use(`/api/${env.API_VERSION}/notifications`, notificationRoutes);
+
+// Compliance Frameworks
+app.use(`/api/${env.API_VERSION}/compliance-frameworks`, complianceFrameworksRoutes);
 
 // Metrics endpoint
 app.get('/metrics', metricsHandler);

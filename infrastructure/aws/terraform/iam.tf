@@ -186,8 +186,7 @@ resource "aws_iam_user_policy" "github_actions" {
         Resource = [
           aws_ecr_repository.frontend.arn,
           aws_ecr_repository.backend.arn,
-          aws_ecr_repository.ml_service.arn,
-          aws_ecr_repository.malgenx.arn
+          aws_ecr_repository.ml_service.arn
         ]
       },
       {

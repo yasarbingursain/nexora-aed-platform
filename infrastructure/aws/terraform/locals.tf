@@ -32,7 +32,6 @@ locals {
     frontend = 3000
     backend  = 8080
     ml       = 8000
-    malgenx  = 8001
     postgres = 5432
     redis    = 6379
   }

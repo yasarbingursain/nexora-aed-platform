@@ -15,6 +15,11 @@ export const frameworkSchema = z.enum([
   'gdpr',
   'nist',
   'ccpa',
+  'sox',
+  'glba',
+  'ffiec',
+  'iso27017_27018',
+  'csa_star',
 ]);
 
 // Report types

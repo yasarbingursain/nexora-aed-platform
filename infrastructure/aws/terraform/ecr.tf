@@ -61,25 +61,6 @@ resource "aws_ecr_repository" "ml_service" {
   })
 }
 
-# MalGenX Repository
-resource "aws_ecr_repository" "malgenx" {
-  name                 = "${local.name_prefix}-malgenx"
-  image_tag_mutability = "MUTABLE"
-
-  image_scanning_configuration {
-    scan_on_push = true
-  }
-
-  encryption_configuration {
-    encryption_type = "KMS"
-    kms_key         = aws_kms_key.main.arn
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "${local.name_prefix}-malgenx"
-  })
-}
-
 # -----------------------------------------------------------------------------
 # Lifecycle Policies (cost optimization - remove old images)
 # -----------------------------------------------------------------------------
@@ -138,10 +119,5 @@ resource "aws_ecr_lifecycle_policy" "backend" {
 
 resource "aws_ecr_lifecycle_policy" "ml_service" {
   repository = aws_ecr_repository.ml_service.name
-  policy     = aws_ecr_lifecycle_policy.frontend.policy
-}
-
-resource "aws_ecr_lifecycle_policy" "malgenx" {
-  repository = aws_ecr_repository.malgenx.name
   policy     = aws_ecr_lifecycle_policy.frontend.policy
 }

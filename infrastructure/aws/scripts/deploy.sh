@@ -137,7 +137,7 @@ deploy_service() {
 }
 
 deploy_all() {
-    for svc in frontend backend ml-service malgenx; do
+    for svc in frontend backend ml-service; do
         deploy_service "$svc"
     done
 }
@@ -193,7 +193,7 @@ show_status() {
     
     aws ecs describe-services \
         --cluster "${CLUSTER_NAME}" \
-        --services "${NAME_PREFIX}-frontend" "${NAME_PREFIX}-backend" "${NAME_PREFIX}-ml-service" "${NAME_PREFIX}-malgenx" \
+        --services "${NAME_PREFIX}-frontend" "${NAME_PREFIX}-backend" "${NAME_PREFIX}-ml-service" \
         --query 'services[*].{Service:serviceName,Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
         --output table \
         --region "${AWS_REGION}"

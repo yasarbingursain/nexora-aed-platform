@@ -78,11 +78,6 @@ const envSchema = z.object({
   ENABLE_PCI_COMPLIANCE: z.string().transform(val => val === 'true').default('false'),
   ENABLE_HIPAA_COMPLIANCE: z.string().transform(val => val === 'true').default('false'),
   ENABLE_SOX_COMPLIANCE: z.string().transform(val => val === 'true').default('false'),
-
-  // MalGenX Service Configuration
-  MALGENX_SERVICE_URL: z.string().url().default('http://localhost:8001'),
-  MALGENX_SERVICE_TIMEOUT_MS: z.string().transform(Number).default('30000'),
-  MALGENX_API_KEY: z.string().min(32, 'MALGENX_API_KEY must be at least 32 characters').optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

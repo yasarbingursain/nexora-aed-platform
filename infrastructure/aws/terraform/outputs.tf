@@ -121,11 +121,6 @@ output "ecr_ml_service_url" {
   value       = aws_ecr_repository.ml_service.repository_url
 }
 
-output "ecr_malgenx_url" {
-  description = "MalGenX ECR repository URL"
-  value       = aws_ecr_repository.malgenx.repository_url
-}
-
 # -----------------------------------------------------------------------------
 # Secrets Outputs
 # -----------------------------------------------------------------------------
