@@ -38,9 +38,6 @@ import {
 import { OsintMetrics } from '@/components/osint/OsintMetrics';
 import { OsintThreatFeed } from '@/components/osint/OsintThreatFeed';
 import { BlocklistPanel } from '@/components/osint/BlocklistPanel';
-import { MalgenxSubmissionForm } from '@/components/malgenx/MalgenxSubmissionForm';
-import { MalgenxThreatsFeed } from '@/components/malgenx/MalgenxThreatsFeed';
-import { MalgenxSamplesList } from '@/components/malgenx/MalgenxSamplesList';
 
 // Entity type mapping for real CVE data
 const entityTypes = ['API Key', 'Service Account', 'AI Agent', 'OAuth Token', 'SSH Key', 'Certificate'];
