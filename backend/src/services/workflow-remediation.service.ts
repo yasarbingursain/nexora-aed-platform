@@ -1210,9 +1210,10 @@ export class WorkflowRemediationService extends EventEmitter {
         approvalId,
       });
     }
+
+    this.pendingApprovals.delete(approvalId);
   }
 
-  this.pendingApprovals.delete(approvalId);
   private generateApprovalId(): string {
     return `approval-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
