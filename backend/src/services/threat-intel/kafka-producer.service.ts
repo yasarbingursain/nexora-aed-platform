@@ -40,11 +40,10 @@ export class KafkaProducerService {
     });
 
     this.producer = this.kafka.producer({
-      allowAutoTopicCreation: false,
-      transactionTimeout: 30000,
-      compression: CompressionTypes.GZIP,
-      idempotent: true, // Prevent duplicate messages
+      allowAutoTopicCreation: true,
+      transactionalId: 'threat-intel-producer',
       maxInFlightRequests: 5,
+      idempotent: true,
     });
   }
 

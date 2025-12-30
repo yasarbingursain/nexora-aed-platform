@@ -45,6 +45,7 @@ interface WorkflowStep {
     target: string;
     parameters: Record<string, any>;
     cloudProvider?: string;
+    blastRadius?: 'low' | 'medium' | 'high' | 'critical';
   };
   approval?: {
     requiredApprovers: number;
@@ -1212,6 +1213,10 @@ export class WorkflowRemediationService extends EventEmitter {
     }
 
     this.pendingApprovals.delete(approvalId);
+  }
+
+  private generateExecutionId(): string {
+    return `exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private generateApprovalId(): string {

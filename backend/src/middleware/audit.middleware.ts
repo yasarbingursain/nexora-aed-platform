@@ -129,15 +129,19 @@ async function createAuditLog(data: AuditLogData): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
+        event: data.action,
+        entityType: data.resource || 'unknown',
+        entityId: data.userId || 'system',
+        action: data.action,
         userId: data.userId || null,
         organizationId: data.organizationId || '',
-        action: data.action,
-        resource: data.resource || null,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent || null,
+        resource: data.resource || null,
         requestBody: data.requestBody || null,
         responseStatus: data.responseStatus || null,
         duration: data.duration || null,
+        severity: 'medium',
         timestamp: data.timestamp,
       },
     });

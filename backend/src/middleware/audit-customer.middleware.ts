@@ -29,15 +29,19 @@ export function auditCustomerActions() {
         try {
           await prisma.auditLog.create({
             data: {
-              userId: userId || null,
-              organizationId: organizationId || '',
+              event: `${req.method}_${req.path.replace(/\//g, '_')}`,
+              entityType: 'api_request',
+              entityId: req.user?.userId || 'anonymous',
               action: `${req.method} ${req.path}`,
-              resource: req.path,
-              ipAddress: req.ip || 'unknown',
+              userId: req.user?.userId || null,
+              organizationId: req.user?.organizationId || '',
+              ipAddress: req.ip || '',
               userAgent: req.headers['user-agent'] || '',
-              requestBody: sanitizeBody(req.body),
+              resource: req.path,
+              requestBody: JSON.stringify(req.body),
               responseStatus: res.statusCode,
-              duration,
+              duration: Date.now() - startTime,
+              severity: res.statusCode >= 400 ? 'high' : 'low',
             },
           });
 

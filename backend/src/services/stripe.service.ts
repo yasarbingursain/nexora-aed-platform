@@ -17,8 +17,11 @@ import { redis } from '@/config/redis';
 
 // Initialize Stripe with API version (graceful handling for development without real keys)
 const stripeKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder';
-const stripe = stripeKey.startsWith('sk_') 
-  ? new Stripe(stripeKey, { apiVersion: '2023-10-16' })
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-11-20.acacia' as any,
+      typescript: true,
+    })
   : null;
 
 if (!stripe) {

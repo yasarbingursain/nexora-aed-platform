@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { 
   Brain, 
   AlertTriangle, 
@@ -190,10 +189,12 @@ export function ExplainableAI({
               <span>Anomaly Score</span>
               <span className="font-medium">{(explanation.prediction.anomaly_score * 100).toFixed(1)}%</span>
             </div>
-            <Progress 
-              value={explanation.prediction.anomaly_score * 100} 
-              className="h-2"
-            />
+            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-red-500 transition-all" 
+                style={{ width: `${explanation.prediction.anomaly_score * 100}%` }}
+              />
+            </div>
           </div>
 
           {/* Confidence */}

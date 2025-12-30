@@ -173,7 +173,7 @@ export async function searchCensysHosts(
 
   try {
     const url = 'https://search.censys.io/api/v2/hosts/search';
-    const authHeader = createBasicAuth(apiId, apiSecret);
+    const authHeader = `Basic ${Buffer.from(`${apiId}:${apiSecret}`).toString('base64')}`;
 
     const response = await fetch(url, {
       method: 'POST',

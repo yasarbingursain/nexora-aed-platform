@@ -47,6 +47,7 @@ model Organization {
   securityEvents    SecurityEvent[]
   adminActions      AdminAuditLog[]
   evidenceLogs      EvidenceLog[]
+  notifications     Notification[]
 
   @@map("organizations")
 }
@@ -88,6 +89,7 @@ model User {
   sessions       UserSession[]
   adminActions   AdminAuditLog[] @relation("AdminActions")
   securityEvents SecurityEvent[]
+  notifications  Notification[]
 
   @@index([lockedUntil])
   @@index([email, lockedUntil])
@@ -233,23 +235,22 @@ model Observation {
 
 // Threats
 model Threat {
-  id             String    @id @default(cuid())
-  title          String
-  description    String
-  severity       String    @default("medium") // low, medium, high, critical
-  status         String    @default("open") // open, investigating, resolved, false_positive
-  category       String    // credential_abuse, privilege_escalation, data_exfiltration, etc.
-  identityId     String?
-  sourceIp       String?
-  indicators     String    @default("[]") // IOCs as JSON string
-  evidence       String    @default("{}")
-  mitreTactics   String    @default("") // MITRE ATT&CK tactics as comma-separated
-  mitreId        String?   // MITRE ATT&CK technique ID
-  assignedTo     String?   // user email
-  resolvedAt     DateTime?
+  id             String   @id @default(cuid())
   organizationId String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  externalId     String?  // CVE-ID, MITRE ATT&CK ID, etc.
+  source         String   @default("internal") // NIST_NVD, MITRE_ATTCK, URLhaus, internal, etc.
+  type           String   // vulnerability, technique, malware, phishing, etc.
+  severity       String   // low, medium, high, critical
+  description    String   @db.Text
+  status         String   @default("active") // active, mitigated, resolved
+  cvssScore      Float?   // CVSS score for vulnerabilities
+  firstSeen      DateTime @default(now())
+  lastSeen       DateTime @default(now())
+  detectedAt     DateTime @default(now())
+  resolvedAt     DateTime?
+  metadata       String   @default("{}") @db.Text // JSON as string - stores references, weaknesses, etc.
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -257,6 +258,13 @@ model Threat {
   incidents    Incident[]
   actions      Action[]
 
+  identityId   String?
+
+  @@unique([externalId, source])
+  @@index([source])
+  @@index([severity])
+  @@index([lastSeen])
+  @@index([organizationId, status])
   @@map("threats")
 }
 

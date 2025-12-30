@@ -4,38 +4,77 @@ import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Logo } from '@/components/ui/Logo';
 import Link from 'next/link';
-import { Eye, EyeOff, Github, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Github, Mail, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { loginFormSchema, type LoginFormData } from '@/lib/validation/forms';
 
 export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
+    rememberMe: false,
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [emailValid, setEmailValid] = useState<boolean | null>(null);
   
   // SECURITY FIX: Use ref for password instead of state
   const passwordRef = useRef<HTMLInputElement>(null);
 
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value;
+    setFormData(prev => ({ ...prev, email }));
+    
+    // Real-time email validation
+    try {
+      loginFormSchema.shape.email.parse(email);
+      setEmailValid(email.length > 0 ? true : null);
+      setErrors(prev => ({ ...prev, email: '' }));
+    } catch {
+      setEmailValid(email.length > 0 ? false : null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setErrors({});
     setIsLoading(true);
     
     try {
       const password = passwordRef.current?.value;
       if (!password) {
-        setError('Password is required');
+        setErrors({ password: 'Password is required' });
         setIsLoading(false);
         return;
       }
 
-      // SECURITY FIX: Server-side authentication
+      // Validate form data
+      const validation = loginFormSchema.safeParse({
+        ...formData,
+        password,
+      });
+
+      if (!validation.success) {
+        const fieldErrors: Record<string, string> = {};
+        validation.error.errors.forEach((err) => {
+          const field = err.path[0] as string;
+          fieldErrors[field] = err.message;
+        });
+        setErrors(fieldErrors);
+        setIsLoading(false);
+        return;
+      }
+
+      // SECURITY: Server-side authentication
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: formData.email, password }),
       });
 
       if (!response.ok) {
@@ -71,11 +110,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">N</span>
-            </div>
-            <span className="text-2xl font-bold text-foreground">Nexora</span>
+          <Link href="/" className="inline-block mb-6">
+            <Logo size="lg" animated />
           </Link>
           <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your Nexora account</p>
@@ -100,14 +136,30 @@ export default function LoginPage() {
                   type="email"
                   id="email"
                   name="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={formData.email}
+                  onChange={handleEmailChange}
+                  className={`w-full pl-10 pr-12 py-3 bg-background border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                    errors.email ? 'border-red-500 focus:ring-red-500' : 
+                    emailValid === true ? 'border-green-500 focus:ring-green-500' :
+                    'border-border focus:ring-blue-500'
+                  }`}
                   placeholder="Enter your email"
                   required
                   autoComplete="email"
                 />
+                {emailValid === true && (
+                  <CheckCircle2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
+                )}
+                {emailValid === false && (
+                  <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
+                )}
               </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.email}
+                </p>
+              )}
             </div>
 
             {/* Password Field */}
@@ -122,7 +174,9 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   id="password"
                   name="password"
-                  className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full pl-10 pr-12 py-3 bg-background border rounded-lg focus:ring-2 focus:border-transparent transition-colors ${
+                    errors.password ? 'border-red-500 focus:ring-red-500' : 'border-border focus:ring-blue-500'
+                  }`}
                   placeholder="Enter your password"
                   required
                   autoComplete="current-password"
@@ -135,6 +189,12 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {errors.password}
+                </p>
+              )}
             </div>
 
             {/* Remember Me & Forgot Password */}
@@ -143,8 +203,8 @@ export default function LoginPage() {
                 <input
                   type="checkbox"
                   name="rememberMe"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  checked={formData.rememberMe}
+                  onChange={(e) => setFormData(prev => ({ ...prev, rememberMe: e.target.checked }))}
                   className="rounded border-border text-blue-600 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-muted-foreground">Remember me</span>

@@ -61,12 +61,12 @@ export class CloudCredentialRotationService {
       }
 
       // Encrypt and store new credentials
-      const encryptedCreds = await encryptionService.encrypt({
+      const encryptedCreds = await encryptionService.encrypt(JSON.stringify({
         accessKeyId: newAccessKey.AccessKeyId,
         secretAccessKey: newAccessKey.SecretAccessKey,
         provider: 'aws',
         rotatedAt: new Date().toISOString(),
-      });
+      }));
 
       await prisma.identity.update({
         where: { id: identityId },
@@ -151,12 +151,12 @@ export class CloudCredentialRotationService {
       const result = await client.setSecret(secretName, newSecret);
 
       // Encrypt and store new credentials
-      const encryptedCreds = await encryptionService.encrypt({
+      const encryptedCreds = await encryptionService.encrypt(JSON.stringify({
         clientId,
         clientSecret: newSecret,
         provider: 'azure',
         rotatedAt: new Date().toISOString(),
-      });
+      }));
 
       await prisma.identity.update({
         where: { id: identityId },
@@ -226,14 +226,14 @@ export class CloudCredentialRotationService {
       }
 
       // Encrypt and store new credentials
-      const encryptedCreds = await encryptionService.encrypt({
+      const encryptedCreds = await encryptionService.encrypt(JSON.stringify({
         projectId,
         serviceAccountEmail,
         accessToken: key.accessToken,
         provider: 'gcp',
         rotatedAt: new Date().toISOString(),
         expiresAt: key.expireTime,
-      });
+      }));
 
       await prisma.identity.update({
         where: { id: identityId },
@@ -286,7 +286,8 @@ export class CloudCredentialRotationService {
       }
 
       // Decrypt existing credentials to get metadata
-      const existingCreds = await encryptionService.decrypt<CloudCredentials>(identity.credentials);
+      const decryptedString = encryptionService.decrypt(identity.credentials);
+      const existingCreds: CloudCredentials = JSON.parse(decryptedString);
 
       let result: RotationResult;
 

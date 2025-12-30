@@ -357,7 +357,6 @@ export class IdentityService {
             severity: 'high',
             description: `ML detected critical anomaly: ${prediction.contributing_factors.join(', ')}`,
             category: 'anomalous_behavior',
-            status: 'active',
             confidence: prediction.confidence,
           });
           
@@ -372,6 +371,69 @@ export class IdentityService {
       }
     });
   }
+
+  /**
+   * Quarantine identity
+   */
+  async quarantine(id: string, organizationId: string, data: QuarantineIdentityInput) {
+    // Verify identity exists
+    const identity = await this.getById(id, organizationId);
+
+// Update status to quarantined
+await identityRepository.updateStatus(id, organizationId, 'quarantined');
+
+// Update risk level to critical
+await identityRepository.updateRiskLevel(id, organizationId, 'critical');
+
+logger.warn('Identity quarantined', {
+  id,
+  organizationId,
+  reason: data.reason,
+});
+
+// Record quarantine activity
+await identityRepository.recordActivity(
+  id,
+  'identity_quarantined',
+  'system',
+  {
+    reason: data.reason,
+    notifyOwner: data.notifyOwner,
+  }
+);
+
+// PRODUCTION: Real network quarantine
+const quarantinedIdentity = await this.getById(id, organizationId);
+  
+if (quarantinedIdentity.metadata) {
+  try {
+    const { awsQuarantineService } = await import('@/services/cloud/aws-quarantine.service');
+    
+    if (awsQuarantineService.isConfigured()) {
+      const metadata = quarantinedIdentity.metadata as any;
+      const ipAddress = metadata.lastSeenIP || metadata.sourceIP;
+      
+      if (ipAddress) {
+        await awsQuarantineService.quarantineIP(ipAddress, data.reason || 'Security threat detected');
+        logger.info('Network quarantine applied', { id, organizationId, ipAddress });
+      }
+    } else {
+      logger.warn('AWS quarantine service not configured, quarantine simulated', { id, organizationId });
+    }
+  } catch (error) {
+    logger.error('Network quarantine failed', { id, organizationId, error });
+    // Don't throw - DB quarantine still applied
+  }
+}
+
+// TODO: Notify owner if requested
+
+return {
+  success: true,
+  message: 'Identity quarantined successfully',
+  identity: await this.getById(id, organizationId),
+};
+}
 
   /**
    * Get identity activities

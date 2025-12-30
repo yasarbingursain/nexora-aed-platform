@@ -215,7 +215,7 @@ export class ThreatIntelIngestionService {
       });
 
       // Validate response schema
-      const validated = URLhausResponseSchema.parse(response.data);
+      const validated = URLhausResponseSchema.parse((response as any).data);
       
       if (validated.query_status !== 'ok') {
         logger.warn('URLhaus query failed', { status: validated.query_status });
@@ -277,7 +277,7 @@ export class ThreatIntelIngestionService {
         });
       });
 
-      const validated = MalwareBazaarResponseSchema.parse(response.data);
+      const validated = MalwareBazaarResponseSchema.parse((response as any).data);
 
       if (validated.query_status !== 'ok') {
         logger.warn('MalwareBazaar query failed');
@@ -340,7 +340,7 @@ export class ThreatIntelIngestionService {
         });
       });
 
-      const validated = ThreatFoxResponseSchema.parse(response.data);
+      const validated = ThreatFoxResponseSchema.parse((response as any).data);
 
       if (validated.query_status !== 'ok') {
         logger.warn('ThreatFox query failed');

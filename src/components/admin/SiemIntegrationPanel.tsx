@@ -340,7 +340,7 @@ export function SiemIntegrationPanel() {
 
         <div className="mt-4 p-3 bg-gray-800/50 rounded-lg">
           <p className="text-xs text-gray-400">
-            <strong className="text-gray-300">Tip:</strong> Export events in your SIEM's native format for easy import.
+            <strong className="text-gray-300">Tip:</strong> Export events in your SIEM&apos;s native format for easy import.
             CEF is widely supported by most SIEMs including Splunk, QRadar, and ArcSight.
             LEEF is optimized for IBM QRadar.
           </p>

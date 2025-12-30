@@ -13,13 +13,7 @@ import { PricingPreview } from '@/components/landing/PricingPreview';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
 import { HeroGlobe } from '@/components/landing/HeroGlobe';
 
-// Live demo data for landing page
-const demoStats = {
-  entitiesProtected: 15420,
-  threatsBlocked: 2847,
-  uptime: 99.99,
-  customersServed: 150,
-};
+// NO HARDCODED DATA - All stats fetched from real API
 
 const features = [
   {
@@ -53,6 +47,13 @@ const integrations = [
 
 export default function LandingPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [stats, setStats] = useState({
+    entitiesProtected: 0,
+    threatsBlocked: 0,
+    uptime: 0,
+    customersServed: 0,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -60,6 +61,33 @@ export default function LandingPage() {
     }, 1000);
 
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch real platform stats from API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats', { cache: 'no-store' });
+        const data = await response.json();
+        
+        if (data.success) {
+          setStats({
+            entitiesProtected: data.data.entitiesProtected,
+            threatsBlocked: data.data.threatsBlocked,
+            uptime: data.data.uptime,
+            customersServed: data.data.customersServed,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setIsLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -137,7 +165,7 @@ export default function LandingPage() {
                     variant="outline" 
                     size="lg" 
                     className="text-lg px-8 py-6 border-2 hover:bg-white/5 transition-all duration-300"
-                    onClick={() => window.location.href = '/auth/signup'}
+                    onClick={() => window.location.href = '/resources'}
                   >
                     Read the Whitepaper
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -167,29 +195,45 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Live Stats - Below Hero */}
+          {/* Live Stats - Below Hero - REAL DATA FROM API */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-6xl mx-auto mt-20">
             <div className="text-center group">
               <div className="text-3xl font-bold text-nexora-primary mb-2 group-hover:scale-110 transition-transform">
-                {demoStats.entitiesProtected.toLocaleString()}+
+                {isLoadingStats ? (
+                  <div className="animate-pulse bg-muted h-10 w-24 mx-auto rounded" />
+                ) : (
+                  `${stats.entitiesProtected.toLocaleString()}+`
+                )}
               </div>
               <div className="text-sm text-muted-foreground">Entities Protected</div>
             </div>
             <div className="text-center group">
               <div className="text-3xl font-bold text-nexora-ai mb-2 group-hover:scale-110 transition-transform">
-                {demoStats.threatsBlocked.toLocaleString()}+
+                {isLoadingStats ? (
+                  <div className="animate-pulse bg-muted h-10 w-24 mx-auto rounded" />
+                ) : (
+                  `${stats.threatsBlocked.toLocaleString()}+`
+                )}
               </div>
-              <div className="text-sm text-muted-foreground">Threats Blocked</div>
+              <div className="text-sm text-muted-foreground">Threats Blocked Today</div>
             </div>
             <div className="text-center group">
               <div className="text-3xl font-bold text-nexora-quantum mb-2 group-hover:scale-110 transition-transform">
-                {demoStats.uptime}%
+                {isLoadingStats ? (
+                  <div className="animate-pulse bg-muted h-10 w-24 mx-auto rounded" />
+                ) : (
+                  `${stats.uptime}%`
+                )}
               </div>
               <div className="text-sm text-muted-foreground">Uptime SLA</div>
             </div>
             <div className="text-center group">
               <div className="text-3xl font-bold text-nexora-warning mb-2 group-hover:scale-110 transition-transform">
-                {demoStats.customersServed}+
+                {isLoadingStats ? (
+                  <div className="animate-pulse bg-muted h-10 w-24 mx-auto rounded" />
+                ) : (
+                  `${stats.customersServed}+`
+                )}
               </div>
               <div className="text-sm text-muted-foreground">Enterprise Customers</div>
             </div>
@@ -283,7 +327,7 @@ export default function LandingPage() {
             </div>
 
             <div className="text-center">
-              <Button size="lg" className="text-lg px-8 py-4" onClick={() => window.location.href = '/client-dashboard'}>
+              <Button size="lg" className="text-lg px-8 py-4" onClick={() => window.location.href = '/demo'}>
                 <Play className="mr-2 h-5 w-5" />
                 Launch Interactive Demo
               </Button>

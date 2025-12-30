@@ -215,7 +215,7 @@ export function TerminalDemo() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isPlaying, isPaused]);
+  }, [isPlaying, isPaused, handlePause]);
 
   return (
     <section className="py-20 px-6 bg-bg-deep/30" role="region" aria-label="Interactive Terminal Demo">
