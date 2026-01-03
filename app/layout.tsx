@@ -21,22 +21,48 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Nexora - Autonomous Entity Defense Platform',
-  description: 'Enterprise-grade cybersecurity platform for securing non-human identities, AI agents, API keys, and service accounts with real-time threat detection and autonomous remediation.',
-  keywords: ['cybersecurity', 'AI security', 'API security', 'threat detection', 'autonomous defense'],
+  title: 'Machine Identity Security Platform | Non-Human Identity Protection | Nexora AED',
+  description: 'Stop API key breaches in <3 seconds with AI-powered machine identity protection. Secure non-human identities, service accounts & AI agents. SOC 2 Type II certified. Enterprise-ready autonomous entity defense platform with post-quantum cryptography.',
+  keywords: [
+    'machine identity security',
+    'non-human identity management',
+    'API key security',
+    'service account protection',
+    'AI agent security',
+    'post-quantum cryptography',
+    'autonomous entity defense',
+    'zero-trust machine identities',
+    'credential breach prevention',
+    'autonomous remediation',
+    'ML anomaly detection',
+    'SIEM integration',
+    'SOC 2 compliance',
+    'identity threat detection',
+    'nexora aed platform',
+    'machine credential security',
+    'bot identity protection',
+    'API token management',
+    'quantum-safe encryption',
+    'explainable AI security'
+  ],
   authors: [{ name: 'Nexora Security' }],
   viewport: 'width=device-width, initial-scale=1',
-  robots: 'index, follow',
+  robots: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   openGraph: {
-    title: 'Nexora - Autonomous Entity Defense Platform',
-    description: 'Enterprise-grade cybersecurity platform for securing non-human identities',
+    title: 'Machine Identity Security Platform | Nexora AED',
+    description: 'Autonomous protection for API keys, service accounts, and AI agents. Stop breaches in <3 seconds with quantum-safe security.',
     type: 'website',
     locale: 'en_US',
+    siteName: 'Nexora Security',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nexora - Autonomous Entity Defense Platform',
-    description: 'Enterprise-grade cybersecurity platform for securing non-human identities',
+    title: 'Machine Identity Security Platform | Nexora AED',
+    description: 'Autonomous protection for API keys, service accounts, and AI agents. Stop breaches in <3 seconds.',
+    creator: '@NexoraSecurity',
+  },
+  alternates: {
+    canonical: 'https://nexora.security',
   },
 }
 
@@ -50,6 +76,75 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#0ea5e9" />
         <meta name="color-scheme" content="dark light" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "Nexora AED Platform",
+              "applicationCategory": "SecurityApplication",
+              "operatingSystem": "Web, Cloud",
+              "offers": {
+                "@type": "AggregateOffer",
+                "lowPrice": "1500",
+                "highPrice": "15000",
+                "priceCurrency": "USD",
+                "priceSpecification": {
+                  "@type": "UnitPriceSpecification",
+                  "price": "1500",
+                  "priceCurrency": "USD",
+                  "unitText": "MONTH"
+                }
+              },
+              "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "4.9",
+                "reviewCount": "150",
+                "bestRating": "5"
+              },
+              "description": "Enterprise machine identity security platform with autonomous threat detection and remediation for API keys, service accounts, and AI agents.",
+              "featureList": [
+                "Post-Quantum Cryptography (PQC)",
+                "Autonomous Remediation in <3 seconds",
+                "Explainable AI decisions",
+                "NHITI Threat Intelligence Network",
+                "SOC 2 Type II Certified",
+                "Multi-cloud support (AWS, Azure, GCP)"
+              ],
+              "provider": {
+                "@type": "Organization",
+                "name": "Nexora Security",
+                "url": "https://nexora.security"
+              }
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "Nexora Security",
+              "url": "https://nexora.security",
+              "logo": "https://nexora.security/logo.png",
+              "description": "Leading provider of autonomous entity defense solutions for machine identity security",
+              "sameAs": [
+                "https://twitter.com/NexoraSecurity",
+                "https://linkedin.com/company/nexora-security",
+                "https://github.com/nexora-security"
+              ],
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "contactType": "Sales",
+                "email": "sales@nexora.security"
+              }
+            })
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `

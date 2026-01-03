@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Docker production output
+  output: 'standalone',
+  
   // Production optimizations
   swcMinify: true,
   compress: true,
@@ -15,6 +18,18 @@ const nextConfig = {
   // Experimental features
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
+  },
+
+  // Performance optimizations
+  poweredByHeader: false,
+  generateEtags: true,
+  reactStrictMode: true,
+  
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
   
   // Enterprise-grade security headers

@@ -1,8 +1,11 @@
 // Landing Page Components Exports
-export { KeyPillars } from './KeyPillars';
-export { TerminalDemo } from './TerminalDemo';
 export { ComparisonMatrix } from './ComparisonMatrix';
-export { PricingPreview } from './PricingPreview';
+export { DevelopmentStatus } from './DevelopmentStatus';
+export { FAQSection } from './FAQSection';
 export { HeroGlobe } from './HeroGlobe';
-export { ThreatGlobe } from './ThreatGlobe';
+export { KeyPillars } from './KeyPillars';
+export { PricingPreview } from './PricingPreview';
 export { ProblemSolution } from './ProblemSolution';
+export { StakeholderSection } from './StakeholderSection';
+export { TerminalDemo } from './TerminalDemo';
+export { ThreatGlobe } from './ThreatGlobe';

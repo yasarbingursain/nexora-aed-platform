@@ -11,46 +11,46 @@ export const ProblemSolution: React.FC = () => {
   const problems = [
     {
       icon: AlertTriangle,
-      title: "45B Machine IDs Unprotected",
-      description: "Traditional security tools can't see or protect AI agents, service accounts, and autonomous entities",
+      title: "Machine Identities Outnumber Humans",
+      description: "API keys, service accounts, and AI agents now vastly outnumber human identities—but traditional tools weren't built for them",
     },
     {
       icon: Bot,
-      title: "AI Agents Morph Freely",
-      description: "Malicious entities disguise themselves, change behaviors, and evade detection without consequence",
+      title: "Breaches via Service Accounts Rising",
+      description: "Snowflake (165 orgs), Treasury (via BeyondTrust), Dropbox Sign—compromised machine credentials are the new attack vector",
     },
     {
       icon: Lock,
-      title: "Quantum Vulnerable",
-      description: "Your RSA/ECC encryption will be broken by quantum computers - are you ready for Q-day?",
+      title: "23.8M Secrets Leaked in 2024",
+      description: "GitGuardian found 23.8M secrets on GitHub, with 70% of 2022 secrets still active today—a ticking time bomb",
     },
     {
       icon: Eye,
-      title: "No Visibility or Control",
-      description: "You can't protect what you can't see. Most orgs have no inventory of non-human identities",
+      title: "200+ Days to Detect Breaches",
+      description: "Without behavioral monitoring, compromised machine identities operate undetected for months",
     },
   ];
 
   const solutions = [
     {
       icon: Shield,
-      title: "Every Entity Tracked",
-      description: "Complete visibility and lifecycle management for all non-human identities across your infrastructure",
+      title: "Complete Lifecycle Tracking",
+      description: "Discover and monitor all non-human identities—AI agents, service accounts, API keys—across cloud, SaaS, and DevOps",
     },
     {
       icon: Zap,
-      title: "Morphing Detected",
-      description: "ML-powered behavioral analysis detects entity morphing and suspicious activity in real-time",
+      title: "Behavioral Anomaly Detection",
+      description: "ML-powered analysis using Isolation Forest and One-Class SVM to detect suspicious activity patterns",
     },
     {
       icon: Lock,
-      title: "Quantum-Ready from Day 1",
-      description: "Post-quantum cryptography (PQC) built-in with NIST-approved algorithms - future-proof today",
+      title: "NIST-Approved Post-Quantum Crypto",
+      description: "Future-proof sensitive data with Kyber, Dilithium, and SPHINCS+ algorithms—ready for the quantum era",
     },
     {
       icon: CheckCircle,
-      title: "Autonomous Response",
-      description: "Automatic quarantine, rotation, and remediation in <3 seconds - no human intervention needed",
+      title: "Automated Response with Safeguards",
+      description: "Credential rotation and network quarantine with dry-run mode and human approval workflows built-in",
     },
   ];
 
@@ -64,10 +64,10 @@ export const ProblemSolution: React.FC = () => {
             Critical Security Gap
           </Badge>
           <h2 className="text-4xl lg:text-5xl font-bold text-foreground mb-6">
-            Your Security Stack Has a Blind Spot
+            Machine Identities Are Your Biggest Security Gap
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Traditional tools were built for humans. But 80% of your identities are now non-human - and completely unprotected.
+            Traditional security tools were built for human identities. But your infrastructure now runs on millions of machine identities—and they&apos;re the new attack vector.
           </p>
         </div>
 
@@ -102,7 +102,7 @@ export const ProblemSolution: React.FC = () => {
                 </div>
                 <p className="text-xs text-center text-red-400">
                   <AlertTriangle className="w-4 h-4 inline mr-1" />
-                  Only 25% of machine identities protected
+                  Most machine identities lack monitoring
                 </p>
               </div>
 
@@ -157,7 +157,7 @@ export const ProblemSolution: React.FC = () => {
                 </div>
                 <p className="text-xs text-center text-nexora-ai">
                   <CheckCircle className="w-4 h-4 inline mr-1" />
-                  100% of machine identities protected
+                  Comprehensive machine identity coverage
                 </p>
               </div>
 
@@ -177,7 +177,7 @@ export const ProblemSolution: React.FC = () => {
 
               <div className="mt-6 p-4 bg-nexora-ai/10 border border-nexora-ai/20 rounded-lg">
                 <p className="text-sm text-nexora-ai font-semibold">
-                  ✅ Result: Threats detected and blocked in &lt;3 seconds automatically
+                  ✅ Result: Rapid threat detection with automated response workflows and human oversight
                 </p>
               </div>
             </div>

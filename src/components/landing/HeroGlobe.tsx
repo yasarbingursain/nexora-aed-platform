@@ -25,6 +25,8 @@ export const HeroGlobe: React.FC = () => {
   const [rotation, setRotation] = useState(0);
   const [threats, setThreats] = useState<ThreatVector[]>([]);
   const [nodes, setNodes] = useState<ThreatNode[]>([]);
+  const [blockedCount, setBlockedCount] = useState(0);
+  const [activeThreats, setActiveThreats] = useState(0);
   const animationRef = useRef<number>();
 
   // Generate realistic threat nodes
@@ -304,10 +306,12 @@ export const HeroGlobe: React.FC = () => {
         ref={canvasRef}
         className="w-full h-full"
         style={{ imageRendering: 'crisp-edges' }}
+        role="img"
+        aria-label={`Interactive threat visualization showing ${threats.filter(t => t.blocked).length} blocked threats out of ${threats.length} total threats detected across ${nodes.length} global locations`}
       />
       
       {/* Live stats overlay */}
-      <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end">
+      <div className="absolute bottom-8 left-8 right-8 flex justify-between items-end" role="region" aria-label="Live threat statistics">
         <div className="bg-nexora-darker/80 backdrop-blur-xl border border-nexora-border/30 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />

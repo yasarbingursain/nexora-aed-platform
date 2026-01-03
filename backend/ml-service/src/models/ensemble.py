@@ -10,7 +10,13 @@ import joblib
 
 from .anomaly.isolation_forest import IsolationForestModel
 from .anomaly.ocsvm import OneClassSVMModel
-from .anomaly.autoencoder import AutoencoderModel
+# Autoencoder requires TensorFlow - import conditionally
+try:
+    from .anomaly.autoencoder import AutoencoderModel
+    AUTOENCODER_AVAILABLE = True
+except ImportError:
+    AutoencoderModel = None
+    AUTOENCODER_AVAILABLE = False
 from .morphing.entity_morphing_detector import EntityMorphingDetector
 from .morphing.behavioral_drift import BehavioralDriftDetector
 from .calibration import AnomalyScoreCalibrator
@@ -57,8 +63,10 @@ class EnsembleModel:
             if 'ocsvm' in self.model_list:
                 self.anomaly_models['ocsvm'] = OneClassSVMModel()
                 
-            if 'autoencoder' in self.model_list:
+            if 'autoencoder' in self.model_list and AUTOENCODER_AVAILABLE:
                 self.anomaly_models['autoencoder'] = AutoencoderModel()
+            elif 'autoencoder' in self.model_list and not AUTOENCODER_AVAILABLE:
+                print("WARNING: Skipping autoencoder model - TensorFlow not available")
             
             # Initialize morphing detection models
             self.morphing_models['entity_morphing'] = EntityMorphingDetector()

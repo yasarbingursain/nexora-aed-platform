@@ -8,47 +8,47 @@ const pillars = [
   {
     id: 1,
     icon: Shield,
-    title: "Autonomous Entity Defense",
-    description: "First platform to secure AI agents that create their own credentials. Monitor entity lifecycle from birth to death, detecting morphing attacks in real-time.",
-    metric: "45B+",
-    metricLabel: "Non-human identities protected",
+    title: "Machine Identity Lifecycle",
+    description: "Comprehensive discovery and tracking for AI agents, service accounts, and API keys across cloud, SaaS, and DevOps environments.",
+    metric: "Multi-Cloud",
+    metricLabel: "AWS, Azure, GCP support",
     gradient: "from-nexora-primary to-blue-500"
   },
   {
     id: 2,
     icon: Lock,
-    title: "Quantum-Resilient Security",
-    description: "Native post-quantum cryptography with NIST-approved algorithms. Future-proof against Q-day with hybrid classical + quantum-safe encryption.",
-    metric: "100%",
-    metricLabel: "Quantum-ready from day 1",
+    title: "Post-Quantum Cryptography",
+    description: "NIST-approved algorithms (Kyber, Dilithium, SPHINCS+) to future-proof sensitive data against quantum computing threats.",
+    metric: "NIST FIPS",
+    metricLabel: "203, 204, 205 compliant",
     gradient: "from-nexora-quantum to-purple-500"
   },
   {
     id: 3,
-    icon: Network,
-    title: "NHITI Network",
-    description: "First crowd-sourced threat intelligence for machine identities. Share malicious fingerprints and behavioral signatures globally.",
-    metric: "1.2M+",
-    metricLabel: "Threat indicators shared",
-    gradient: "from-nexora-ai to-green-500"
-  },
-  {
-    id: 4,
     icon: Brain,
     title: "Explainable AI",
-    description: "Every automated decision comes with clear forensic timeline. Map actions to compliance frameworks with transparent AI reasoning.",
-    metric: "100%",
-    metricLabel: "Audit trail coverage",
+    description: "SHAP, LIME, and counterfactual explanations for every security decision—built for GDPR and EU AI Act compliance.",
+    metric: "Full Transparency",
+    metricLabel: "Every decision explained",
     gradient: "from-nexora-warning to-yellow-500"
   },
   {
-    id: 5,
+    id: 4,
     icon: Zap,
-    title: "Autonomous Remediation",
-    description: "Real-time automated countermeasures beyond alerts. Quarantine rogue identities and rotate credentials in <3 seconds.",
-    metric: "<3s",
-    metricLabel: "Average response time",
+    title: "Automated Response",
+    description: "Credential rotation and network quarantine with dry-run mode by default and human approval workflows for high-risk actions.",
+    metric: "Human-in-Loop",
+    metricLabel: "Safe automation",
     gradient: "from-nexora-threat to-pink-500"
+  },
+  {
+    id: 5,
+    icon: Network,
+    title: "Behavioral Analysis",
+    description: "ML-powered anomaly detection using Isolation Forest, One-Class SVM, and autoencoders to identify suspicious patterns.",
+    metric: "ML-Powered",
+    metricLabel: "Advanced detection",
+    gradient: "from-nexora-ai to-green-500"
   }
 ];
 
@@ -58,10 +58,10 @@ export function KeyPillars() {
       <div className="container mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Five Reasons Nexora Will Define the Category
+            What Makes Nexora Different
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Built from the ground up for the autonomous era. Not an iteration—a revolution.
+            Purpose-built for machine identity security with post-quantum cryptography, explainable AI, and human-in-the-loop automation.
           </p>
         </div>
 

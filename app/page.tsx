@@ -1,17 +1,25 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
-import { ArrowRight, Shield, Zap, Eye, Github, Play, CheckCircle, Star, Users, TrendingUp } from 'lucide-react';
+import { ArrowRight, Shield, Zap, Eye, Play, CheckCircle } from 'lucide-react';
 import { KeyPillars } from '@/components/landing/KeyPillars';
 import { TerminalDemo } from '@/components/landing/TerminalDemo';
 import { ComparisonMatrix } from '@/components/landing/ComparisonMatrix';
 import { PricingPreview } from '@/components/landing/PricingPreview';
 import { ProblemSolution } from '@/components/landing/ProblemSolution';
-import { HeroGlobe } from '@/components/landing/HeroGlobe';
+import { FAQSection } from '@/components/landing/FAQSection';
+import { StakeholderSection } from '@/components/landing/StakeholderSection';
+
+// Lazy load heavy 3D globe component for better performance
+const HeroGlobe = dynamic(() => import('@/components/landing/HeroGlobe').then(mod => ({ default: mod.HeroGlobe })), {
+  loading: () => <div className="h-[600px] lg:h-[700px] bg-muted/20 rounded-lg animate-pulse" aria-label="Loading interactive globe visualization" />,
+  ssr: false
+});
 
 // NO HARDCODED DATA - All stats fetched from real API
 
@@ -111,8 +119,12 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => window.location.href = '/auth/login'}>Sign In</Button>
-              <Button onClick={() => window.location.href = '/auth/signup'}>Get Started</Button>
+              <Link href="/auth/login">
+                <Button variant="ghost">Sign In</Button>
+              </Link>
+              <Link href="/auth/signup">
+                <Button>Get Started</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -153,23 +165,25 @@ export default function LandingPage() {
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                <Button 
+                <Link href="/demo">
+                  <Button 
                     size="lg" 
                     className="text-lg px-8 py-6 bg-gradient-to-r from-nexora-primary to-blue-600 hover:from-nexora-primary/90 hover:to-blue-600/90 shadow-lg shadow-nexora-primary/30 hover:shadow-xl hover:shadow-nexora-primary/40 transition-all duration-300 hover:-translate-y-0.5"
-                    onClick={() => window.location.href = '/demo'}
                   >
-                    <Play className="mr-2 h-5 w-5" />
+                    <Play className="mr-2 h-5 w-5" aria-hidden="true" />
                     See Threats in Real-Time
                   </Button>
-                <Button 
+                </Link>
+                <Link href="/resources">
+                  <Button 
                     variant="outline" 
                     size="lg" 
                     className="text-lg px-8 py-6 border-2 hover:bg-white/5 transition-all duration-300"
-                    onClick={() => window.location.href = '/resources'}
                   >
                     Read the Whitepaper
-                    <ArrowRight className="ml-2 h-5 w-5" />
+                    <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
                   </Button>
+                </Link>
               </div>
               
               {/* Social Proof */}
@@ -190,7 +204,7 @@ export default function LandingPage() {
             </div>
             
             {/* Right: Live Threat Globe */}
-            <div className="relative h-[600px] lg:h-[700px]">
+            <div className="relative h-[600px] lg:h-[700px]" role="img" aria-label="Interactive 3D globe showing real-time threat detection across global infrastructure">
               <HeroGlobe />
             </div>
           </div>
@@ -287,8 +301,14 @@ export default function LandingPage() {
       {/* Comparison Matrix */}
       <ComparisonMatrix />
 
+      {/* Stakeholder-Specific Benefits */}
+      <StakeholderSection />
+
       {/* Pricing Preview */}
       <PricingPreview />
+
+      {/* FAQ Section for Voice Search Optimization */}
+      <FAQSection />
 
       {/* Live Demo Section */}
       <section id="demo" className="py-20 px-6">
@@ -327,10 +347,12 @@ export default function LandingPage() {
             </div>
 
             <div className="text-center">
-              <Button size="lg" className="text-lg px-8 py-4" onClick={() => window.location.href = '/demo'}>
-                <Play className="mr-2 h-5 w-5" />
-                Launch Interactive Demo
-              </Button>
+              <Link href="/demo">
+                <Button size="lg" className="text-lg px-8 py-4">
+                  <Play className="mr-2 h-5 w-5" aria-hidden="true" />
+                  Launch Interactive Demo
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -361,10 +383,12 @@ export default function LandingPage() {
           </div>
 
           <div className="text-center mt-12">
-            <Button variant="outline" size="lg" onClick={() => window.location.href = '/integrations'}>
-              View All Integrations
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            <Link href="/integrations">
+              <Button variant="outline" size="lg">
+                View All Integrations
+                <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -380,13 +404,17 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="text-lg px-8 py-4" onClick={() => window.location.href = '/auth/signup'}>
-              Start Free Trial
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-4" onClick={() => window.location.href = '/contact'}>
-              Schedule Demo
-            </Button>
+            <Link href="/auth/signup">
+              <Button size="lg" className="text-lg px-8 py-4">
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" aria-hidden="true" />
+              </Button>
+            </Link>
+            <Link href="/contact">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-4">
+                Schedule Demo
+              </Button>
+            </Link>
           </div>
         </div>
       </section>

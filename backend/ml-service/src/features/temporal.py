@@ -13,7 +13,7 @@ class TenantIsolationError(Exception):
     """Raised when cross-tenant data is detected."""
     pass
 
-import defaultdict
+from collections import defaultdict
 import asyncio
 
 from ..config import model_config

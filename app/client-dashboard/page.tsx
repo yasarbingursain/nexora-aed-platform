@@ -252,6 +252,7 @@ export default function ClientDashboard() {
                 value={selectedTimeRange} 
                 onChange={(e) => setSelectedTimeRange(e.target.value)}
                 className="bg-card border border-border rounded-md px-3 py-2 text-sm"
+                aria-label="Select time range"
               >
                 <option value="1h">Last Hour</option>
                 <option value="24h">Last 24 Hours</option>
@@ -263,6 +264,7 @@ export default function ClientDashboard() {
               onClick={fetchLiveThreatData}
               disabled={isLoading}
               className="inline-flex items-center justify-center gap-2 h-9 rounded-md px-3 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:pointer-events-none transition-colors"
+              aria-label="Refresh live threat data"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               {isLoading ? 'Updating...' : 'Refresh Live Data'}
@@ -270,6 +272,7 @@ export default function ClientDashboard() {
             <button 
               onClick={() => toast.info('Export functionality coming soon')}
               className="inline-flex items-center justify-center gap-2 h-9 rounded-md px-3 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+              aria-label="Export data"
             >
               <Download className="h-4 w-4" />
               Export
@@ -352,10 +355,10 @@ export default function ClientDashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-foreground">Active Threats</h2>
                 <div className="flex items-center gap-2">
-                  <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                  <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="Filter threats">
                     <Filter className="h-4 w-4" />
                   </button>
-                  <button className="inline-flex items-center justify-center h-9 rounded-md px-3 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                  <button className="inline-flex items-center justify-center h-9 rounded-md px-3 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="View all threats">
                     View All
                   </button>
                 </div>
@@ -383,10 +386,10 @@ export default function ClientDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="View threat details">
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                        <button className="inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors" aria-label="More options">
                           <MoreVertical className="h-4 w-4" />
                         </button>
                       </div>
@@ -544,6 +547,7 @@ export default function ClientDashboard() {
               onClick={handleScanEntities}
               disabled={isScanning}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-blue-500/5 hover:border-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Scan entities"
             >
               <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
                 <Search className="h-6 w-6 text-blue-400" />
@@ -561,6 +565,7 @@ export default function ClientDashboard() {
             <button
               onClick={handleGenerateReport}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-green-500/5 hover:border-green-500/50 transition-all duration-300"
+              aria-label="Generate report"
             >
               <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 group-hover:scale-110 transition-all duration-300">
                 <BarChart3 className="h-6 w-6 text-green-400" />
@@ -573,6 +578,7 @@ export default function ClientDashboard() {
             <button
               onClick={handleConfigurePolicies}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-purple-500/5 hover:border-purple-500/50 transition-all duration-300"
+              aria-label="Configure policies"
             >
               <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 group-hover:scale-110 transition-all duration-300">
                 <Settings className="h-6 w-6 text-purple-400" />
@@ -585,6 +591,7 @@ export default function ClientDashboard() {
             <button
               onClick={handleSecuritySettings}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-orange-500/5 hover:border-orange-500/50 transition-all duration-300"
+              aria-label="Security settings"
             >
               <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 group-hover:scale-110 transition-all duration-300">
                 <Lock className="h-6 w-6 text-orange-400" />
@@ -597,6 +604,7 @@ export default function ClientDashboard() {
             <button
               onClick={handleComplianceCheck}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-cyan-500/5 hover:border-cyan-500/50 transition-all duration-300"
+              aria-label="Compliance check"
             >
               <div className="w-12 h-12 rounded-lg bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 group-hover:scale-110 transition-all duration-300">
                 <FileText className="h-6 w-6 text-cyan-400" />
@@ -609,6 +617,7 @@ export default function ClientDashboard() {
             <button
               onClick={handleExportData}
               className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-border bg-card hover:bg-indigo-500/5 hover:border-indigo-500/50 transition-all duration-300"
+              aria-label="Export data"
             >
               <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 group-hover:scale-110 transition-all duration-300">
                 <Download className="h-6 w-6 text-indigo-400" />

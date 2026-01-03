@@ -18,52 +18,52 @@ const features: Array<{
   okta: FeatureDetail;
 }> = [
   {
-    name: 'AI Agents & Bots',
-    nexora: { status: 'yes' as const, detail: 'First-class support with behavioral baselines' },
-    cyberark: { status: 'no' as const, detail: 'Static credentials only, no AI agent support' },
-    okta: { status: 'no' as const, detail: 'Human identity focus, limited machine identity' }
+    name: 'AI Agent Lifecycle',
+    nexora: { status: 'yes' as const, detail: 'Discovery and tracking for AI agents, service accounts, API keys' },
+    cyberark: { status: 'partial' as const, detail: 'PAM for static credentials, limited AI agent support' },
+    okta: { status: 'partial' as const, detail: 'Human identity focus with machine identity add-ons' }
   },
   {
-    name: 'Quantum-Safe Crypto',
-    nexora: { status: 'yes' as const, detail: 'NIST-approved PQC algorithms (Kyber, Dilithium)' },
-    cyberark: { status: 'no' as const, detail: 'Classical crypto only, no quantum roadmap' },
+    name: 'Post-Quantum Crypto',
+    nexora: { status: 'yes' as const, detail: 'NIST FIPS 203/204/205 (Kyber, Dilithium, SPHINCS+)' },
+    cyberark: { status: 'no' as const, detail: 'Classical cryptography, no PQC roadmap announced' },
     okta: { status: 'no' as const, detail: 'No post-quantum cryptography support' }
   },
   {
-    name: 'Autonomous Remediation',
-    nexora: { status: 'yes' as const, detail: 'Real-time response in <3 seconds with rollback' },
-    cyberark: { status: 'partial' as const, detail: 'Manual workflows required for most actions' },
-    okta: { status: 'no' as const, detail: 'Alerting only, no automated response' }
+    name: 'Automated Response',
+    nexora: { status: 'yes' as const, detail: 'Credential rotation & quarantine with dry-run mode and approvals' },
+    cyberark: { status: 'partial' as const, detail: 'Workflow automation available, requires configuration' },
+    okta: { status: 'no' as const, detail: 'Alerting and reporting, limited automated actions' }
   },
   {
     name: 'Explainable AI',
-    nexora: { status: 'yes' as const, detail: 'Full forensic timeline for every decision' },
-    cyberark: { status: 'no' as const, detail: 'Rule-based detection, no ML explanations' },
-    okta: { status: 'no' as const, detail: 'Limited visibility into detection logic' }
+    nexora: { status: 'yes' as const, detail: 'SHAP, LIME, counterfactuals for GDPR/EU AI Act compliance' },
+    cyberark: { status: 'no' as const, detail: 'Rule-based detection without ML explanations' },
+    okta: { status: 'no' as const, detail: 'Limited transparency in detection logic' }
   },
   {
-    name: 'Threat Intelligence',
-    nexora: { status: 'yes' as const, detail: 'Global NHITI network with crowd-sourced IOCs' },
-    cyberark: { status: 'no' as const, detail: 'No shared threat intelligence network' },
-    okta: { status: 'no' as const, detail: 'Limited to internal threat data' }
+    name: 'Behavioral Analysis',
+    nexora: { status: 'yes' as const, detail: 'ML anomaly detection with Isolation Forest, One-Class SVM, autoencoders' },
+    cyberark: { status: 'no' as const, detail: 'Static policy enforcement, no behavioral ML' },
+    okta: { status: 'partial' as const, detail: 'Basic anomaly detection for human identities' }
   },
   {
-    name: 'Entity Morphing Detection',
-    nexora: { status: 'yes' as const, detail: 'Behavioral drift and identity lineage tracking' },
-    cyberark: { status: 'no' as const, detail: 'Static identity model, no morphing detection' },
-    okta: { status: 'no' as const, detail: 'No behavioral analysis for machine identities' }
+    name: 'Multi-Cloud Support',
+    nexora: { status: 'yes' as const, detail: 'Native AWS, Azure, GCP integrations with Kubernetes' },
+    cyberark: { status: 'yes' as const, detail: 'Multi-cloud PAM with extensive integrations' },
+    okta: { status: 'yes' as const, detail: 'Cloud-native with broad SaaS integrations' }
   },
   {
-    name: 'Setup Time',
-    nexora: { status: 'yes' as const, detail: '< 1 week with automated discovery' },
-    cyberark: { status: 'no' as const, detail: '6+ months with extensive professional services' },
-    okta: { status: 'partial' as const, detail: '3 months for enterprise deployment' }
+    name: 'Deployment Speed',
+    nexora: { status: 'partial' as const, detail: 'Cloud-native architecture, early-stage product' },
+    cyberark: { status: 'no' as const, detail: 'Enterprise deployment typically 3-6 months' },
+    okta: { status: 'yes' as const, detail: 'SaaS deployment, faster time-to-value' }
   },
   {
-    name: 'Compliance Mapping',
-    nexora: { status: 'yes' as const, detail: 'Auto-map to NIST, PCI, HIPAA, SOC2, GDPR' },
-    cyberark: { status: 'partial' as const, detail: 'Manual compliance reporting' },
-    okta: { status: 'partial' as const, detail: 'Limited compliance automation' }
+    name: 'Compliance Frameworks',
+    nexora: { status: 'yes' as const, detail: 'NIST, PCI, HIPAA, SOC2, GDPR mapping with audit trails' },
+    cyberark: { status: 'yes' as const, detail: 'Comprehensive compliance reporting and certifications' },
+    okta: { status: 'yes' as const, detail: 'Strong compliance capabilities for identity' }
   }
 ];
 
@@ -85,10 +85,10 @@ export function ComparisonMatrix() {
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Why CISOs Choose Nexora
+            How Nexora Compares
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Over CyberArk, Okta, and point solutions. Built for the autonomous era, not retrofitted.
+            Honest comparison with established players. We&apos;re purpose-built for machine identity security with unique capabilities.
           </p>
         </div>
 

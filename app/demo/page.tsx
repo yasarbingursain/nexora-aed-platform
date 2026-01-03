@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getJaneDoeConfig } from '@/lib/demo/jane-doe-config';
 import { 
   Shield, 
@@ -46,6 +47,7 @@ interface ScanActivity {
 }
 
 export default function LiveDemoPage() {
+  const router = useRouter();
   const [liveThreats, setLiveThreats] = useState<ThreatEvent[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -302,7 +304,7 @@ export default function LiveDemoPage() {
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Button onClick={() => window.location.href = '/client-dashboard'}>
+              <Button onClick={() => router.push('/client-dashboard')}>
                 <Eye className="w-4 h-4 mr-2" />
                 Full Dashboard
               </Button>
@@ -641,7 +643,7 @@ export default function LiveDemoPage() {
             Access the full admin panel to explore all features and real-time monitoring capabilities.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button size="lg" className="bg-nexora-primary hover:bg-nexora-primary/90" onClick={() => window.location.href = '/client-dashboard'}>
+            <Button size="lg" className="bg-nexora-primary hover:bg-nexora-primary/90" onClick={() => router.push('/client-dashboard')}>
               <Eye className="w-5 h-5 mr-2" />
               Access Full Admin Panel
             </Button>
