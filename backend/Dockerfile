@@ -20,8 +20,8 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
-RUN npm run build
+# Install ts-node and typescript for running TypeScript directly
+RUN npm install --save-dev ts-node typescript @types/node
 
 # Production image, copy all the files and run the app
 FROM base AS runner
@@ -33,10 +33,11 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nexora
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Copy source code and dependencies
+COPY --from=builder /app/src ./src
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/prisma ./prisma
 
 # Create logs directory
@@ -53,5 +54,5 @@ ENV PORT=8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application
-CMD ["node", "dist/server.js"]
+# Start the application with ts-node
+CMD ["npx", "ts-node", "src/server.ts"]

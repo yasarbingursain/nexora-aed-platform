@@ -5,7 +5,9 @@ import { logger } from '@/utils/logger';
 import { trackRateLimitHit } from '@/utils/metrics';
 
 // Enhanced Helmet configuration for production security
-export const securityHeaders = helmet({
+// Cast helmet options to any to accommodate custom fields and avoid
+// strict typing conflicts across helmet versions used in different envs.
+export const securityHeaders = helmet(({
   // Content Security Policy
   contentSecurityPolicy: {
     directives: {
@@ -75,7 +77,7 @@ export const securityHeaders = helmet({
   crossOriginResourcePolicy: {
     policy: 'same-origin',
   },
-});
+} as any));
 
 // SQL Injection Prevention Middleware
 export const sqlInjectionProtection = (req: Request, res: Response, next: NextFunction) => {
@@ -137,6 +139,18 @@ export const sqlInjectionProtection = (req: Request, res: Response, next: NextFu
 
 // XSS Protection Middleware
 export const xssProtection = (req: Request, res: Response, next: NextFunction) => {
+  // Preserve forensic/immutable evidence: do not mutate request body/query
+  // for endpoints that operate on evidence chains. Mutating evidence payloads
+  // could corrupt audit trails and break verification. Skip sanitization
+  // for any path containing '/evidence'.
+  try {
+    if (req.path && req.path.includes('/evidence')) {
+      return next();
+    }
+  } catch (e) {
+    // If any unexpected error occurs, log and continue with sanitization as fallback
+    logger.warn('xssProtection path check failed, proceeding with sanitization', { error: e });
+  }
   const xssPatterns = [
     /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
     /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,

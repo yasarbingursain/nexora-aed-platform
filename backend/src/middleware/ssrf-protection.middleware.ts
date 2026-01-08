@@ -171,7 +171,7 @@ export async function safeFetch(
   url: string,
   options: RequestInit = {},
   timeout: number = 10000
-): Promise<Response> {
+): Promise<any> {
   // Validate URL first
   await validateUrl(url);
 

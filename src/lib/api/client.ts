@@ -4,6 +4,7 @@
  */
 
 import secureApiClient from './secure-client';
+import { getStoredTokens } from '@/services/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
@@ -28,13 +29,13 @@ export class APIClient {
       },
     };
 
-    // Add auth token if available
+    // Add auth token if available (use centralized token storage)
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
+      const tokens = getStoredTokens();
+      if (tokens?.accessToken) {
         config.headers = {
           ...config.headers,
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${tokens.accessToken}`,
         };
       }
     }

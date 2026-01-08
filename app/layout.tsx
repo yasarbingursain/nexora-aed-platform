@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { cn } from '@/lib/utils'
 import { ConsentProvider } from '@/providers/ConsentProvider'
@@ -66,20 +67,26 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Get CSP nonce from middleware for proper inline script execution
+  const headersList = await headers();
+  const nonce = headersList.get('x-nonce') || '';
+
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#0ea5e9" />
         <meta name="color-scheme" content="dark light" />
+        <meta property="csp-nonce" content={nonce} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
@@ -124,6 +131,7 @@ export default function RootLayout({
         />
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
@@ -146,6 +154,7 @@ export default function RootLayout({
           }}
         />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `
               // Suppress MetaMask and other browser extension errors

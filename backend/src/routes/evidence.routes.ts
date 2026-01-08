@@ -5,6 +5,8 @@
 
 import { Router } from 'express';
 import { evidenceController } from '@/controllers/evidence.controller';
+import { authenticate } from '@/middleware/auth.middleware';
+import { tenantMiddleware } from '@/middleware/tenant.middleware';
 
 const router = Router();
 
@@ -17,6 +19,9 @@ const router = Router();
  * @returns {400} Bad request
  * @returns {500} Server error
  */
+router.use(authenticate);
+router.use(tenantMiddleware);
+
 router.post('/verify', evidenceController.verifyChain.bind(evidenceController));
 
 /**

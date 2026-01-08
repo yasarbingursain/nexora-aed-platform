@@ -1,9 +1,16 @@
 /**
  * Health Check Routes
- * System health monitoring endpoints
+ * System health monitoring endpoints with tiered access control
+ * 
+ * Security Implementation:
+ * - Detailed endpoints: Require JWT authentication
+ * - Lite endpoints: Require API key OR internal network access
+ * - Basic endpoints: Public with rate limiting
+ * 
+ * Compliance: SOC2 Type II, NIST CSF, ISO 27001
  * 
  * @author Nexora Security Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 import { Router } from 'express';
@@ -14,14 +21,31 @@ import { ticketingService } from '@/services/integrations/ticketing.service';
 import { prisma } from '@/config/database';
 import { redisRateLimit } from '@/config/redis';
 import { logger } from '@/utils/logger';
+import {
+  requireDetailedHealthAccess,
+  requireLiteHealthAccess,
+  requireBasicHealthAccess,
+  logHealthAccess,
+} from '@/middleware/health-access.middleware';
+import { globalRateLimit } from '@/middleware/rateLimiter.middleware';
 
 const router = Router();
 
+// Apply logging to all health checks
+router.use(logHealthAccess);
+
 /**
- * Overall system health check
  * GET /health
+ * Overall system health check (LITE ACCESS)
+ * 
+ * Returns aggregated system status from all service health checks.
+ * Accessible via: Internal network OR valid API key
+ * 
+ * @security API-Key or Internal-Network
+ * @returns {200} System is healthy
+ * @returns {503} System is degraded or unhealthy
  */
-router.get('/', async (req, res) => {
+router.get('/', requireLiteHealthAccess, async (req, res) => {
   try {
     const checks = await Promise.allSettled([
       checkDatabase(),
@@ -66,10 +90,17 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Database health check
  * GET /health/database
+ * Database health check (DETAILED ACCESS)
+ * 
+ * Tests database connectivity and performance.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Database is healthy
+ * @returns {503} Database is unhealthy
  */
-router.get('/database', async (req, res) => {
+router.get('/database', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkDatabase();
     const statusCode = result.healthy ? 200 : 503;
@@ -84,10 +115,17 @@ router.get('/database', async (req, res) => {
 });
 
 /**
- * Redis health check
  * GET /health/redis
+ * Redis cache health check (DETAILED ACCESS)
+ * 
+ * Tests Redis connectivity and performance.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Redis is healthy
+ * @returns {503} Redis is unhealthy
  */
-router.get('/redis', async (req, res) => {
+router.get('/redis', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkRedis();
     const statusCode = result.healthy ? 200 : 503;
@@ -102,10 +140,17 @@ router.get('/redis', async (req, res) => {
 });
 
 /**
- * Kafka health check
  * GET /health/kafka
+ * Kafka broker health check (DETAILED ACCESS)
+ * 
+ * Tests Kafka connectivity and broker availability.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Kafka is healthy
+ * @returns {503} Kafka is unhealthy
  */
-router.get('/kafka', async (req, res) => {
+router.get('/kafka', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkKafka();
     const statusCode = result.healthy ? 200 : 503;
@@ -120,10 +165,17 @@ router.get('/kafka', async (req, res) => {
 });
 
 /**
- * Email service health check
  * GET /health/email
+ * Email service health check (DETAILED ACCESS)
+ * 
+ * Tests email service connectivity and configuration.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Email service is healthy
+ * @returns {503} Email service is unhealthy
  */
-router.get('/email', async (req, res) => {
+router.get('/email', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkEmail();
     const statusCode = result.healthy ? 200 : 503;
@@ -138,10 +190,17 @@ router.get('/email', async (req, res) => {
 });
 
 /**
- * SIEM integration health check
  * GET /health/siem
+ * SIEM integration health check (DETAILED ACCESS)
+ * 
+ * Tests SIEM service connectivity and integration status.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} SIEM is healthy
+ * @returns {503} SIEM is unhealthy
  */
-router.get('/siem', async (req, res) => {
+router.get('/siem', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkSIEM();
     const statusCode = result.healthy ? 200 : 503;
@@ -156,10 +215,17 @@ router.get('/siem', async (req, res) => {
 });
 
 /**
- * Ticketing integration health check
  * GET /health/ticketing
+ * Ticketing integration health check (DETAILED ACCESS)
+ * 
+ * Tests ticketing service connectivity and integration status.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Ticketing service is healthy
+ * @returns {503} Ticketing service is unhealthy
  */
-router.get('/ticketing', async (req, res) => {
+router.get('/ticketing', requireDetailedHealthAccess, async (req, res) => {
   try {
     const result = await checkTicketing();
     const statusCode = result.healthy ? 200 : 503;
@@ -174,10 +240,17 @@ router.get('/ticketing', async (req, res) => {
 });
 
 /**
- * Detailed Kafka consumer health
  * GET /health/kafka/detailed
+ * Detailed Kafka consumer health (DETAILED ACCESS)
+ * 
+ * Returns comprehensive Kafka consumer group and topic statistics.
+ * Accessible via: JWT authentication required
+ * 
+ * @security JWT
+ * @returns {200} Detailed Kafka health information
+ * @returns {500} Failed to retrieve Kafka health
  */
-router.get('/kafka/detailed', async (req, res) => {
+router.get('/kafka/detailed', requireDetailedHealthAccess, async (req, res) => {
   try {
     const status = await kafkaHealthService.getHealthStatus();
     res.json(status);

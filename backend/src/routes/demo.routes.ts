@@ -6,7 +6,8 @@
  * @version 2.1.0
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { env } from '@/config/env';
 import {
   getScenarios,
   loadScenario,
@@ -18,6 +19,17 @@ import {
 } from '../controllers/demo.controller';
 
 const router = Router();
+
+// Demo mode guard - disable in production unless explicitly enabled
+const requireDemoMode = (req: Request, res: Response, next: NextFunction) => {
+  if ((env as any).ENABLE_DEMO !== 'true') {
+    return res.status(403).json({ success: false, error: 'Demo mode is disabled' });
+  }
+  next();
+};
+
+// Apply guard to all demo routes
+router.use(requireDemoMode);
 
 /**
  * @route   GET /api/demo/scenarios

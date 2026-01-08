@@ -8,6 +8,7 @@ import { Logo } from '@/components/ui/Logo';
 import Link from 'next/link';
 import { Eye, EyeOff, Github, Mail, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { loginFormSchema, type LoginFormData } from '@/lib/validation/forms';
+import { storeTokens } from '@/services/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -82,10 +83,24 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      const { user, accessToken } = await response.json();
-      
-      // Store token securely
-      localStorage.setItem('accessToken', accessToken);
+      const { user, accessToken, refreshToken } = await response.json();
+
+      // Compute expiry from JWT `exp` claim and store tokens centrally
+      const parseJwtExp = (token: string): number => {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          return (payload.exp || 0) * 1000;
+        } catch {
+          return Date.now() + 60 * 60 * 1000; // fallback 1 hour
+        }
+      };
+
+      storeTokens({
+        accessToken,
+        refreshToken,
+        expiresAt: parseJwtExp(accessToken),
+        tokenType: 'Bearer',
+      });
       
       // Clear password field
       if (passwordRef.current) {

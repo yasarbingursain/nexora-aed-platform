@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUIStore } from '@/stores/uiStore';
 import type { Threat } from '@/types/api.types';
 import { toast } from 'react-hot-toast';
+import { getStoredTokens } from '@/services/api';
 
 let socket: Socket | null = null;
 
@@ -51,11 +52,11 @@ export function useRealtimeThreats() {
     // Initialize socket connection
     if (!socket) {
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
-      const token = localStorage.getItem('nexora_tokens');
-      
+      const tokens = getStoredTokens();
+
       socket = io(wsUrl, {
         auth: {
-          token: token ? JSON.parse(atob(token)).accessToken : '',
+          token: tokens?.accessToken || '',
         },
         transports: ['websocket', 'polling'],
         reconnection: true,

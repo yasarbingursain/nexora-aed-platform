@@ -10,8 +10,12 @@
 
 import { Router } from 'express';
 import { gdprController } from '@/controllers/gdpr.controller';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const router = Router();
+
+// Protect GDPR endpoints - authentication required
+router.use(requireAuth);
 
 /**
  * POST /api/v1/gdpr/dsar

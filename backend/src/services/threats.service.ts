@@ -93,7 +93,7 @@ export class ThreatService {
       let evidence: any = {};
 
       try {
-        indicators = ThreatIndicatorsSchema.parse(JSON.parse(threat.indicators || '[]'));
+        indicators = ThreatIndicatorsSchema.parse(JSON.parse((threat as any).indicators || '[]'));
       } catch (error) {
         logger.warn('Invalid threat indicators', { 
           threatId: threat.id,
@@ -102,7 +102,7 @@ export class ThreatService {
       }
 
       try {
-        evidence = ThreatEvidenceSchema.parse(JSON.parse(threat.evidence || '{}'));
+        evidence = ThreatEvidenceSchema.parse(JSON.parse((threat as any).evidence || '{}'));
       } catch (error) {
         logger.warn('Invalid threat evidence', { 
           threatId: threat.id,
@@ -114,7 +114,7 @@ export class ThreatService {
         ...threat,
         indicators,
         evidence,
-        mitreTactics: threat.mitreTactics ? threat.mitreTactics.split(',').filter(Boolean) : [],
+        mitreTactics: (threat as any).mitreTactics ? (threat as any).mitreTactics.split(',').filter(Boolean) : [],
       };
     });
 
@@ -161,7 +161,7 @@ export class ThreatService {
     // SECURITY: Validate indicators
     let indicators: any[] = [];
     try {
-      indicators = ThreatIndicatorsSchema.parse(JSON.parse(threat.indicators || '[]'));
+      indicators = ThreatIndicatorsSchema.parse(JSON.parse((threat as any).indicators || '[]'));
     } catch (error) {
       logger.error('Corrupted threat indicators', { 
         id, 
@@ -174,7 +174,7 @@ export class ThreatService {
     // SECURITY: Validate evidence
     let evidence: any = {};
     try {
-      evidence = ThreatEvidenceSchema.parse(JSON.parse(threat.evidence || '{}'));
+      evidence = ThreatEvidenceSchema.parse(JSON.parse((threat as any).evidence || '{}'));
     } catch (error) {
       logger.error('Corrupted threat evidence', { 
         id, 
@@ -184,13 +184,13 @@ export class ThreatService {
       throw new Error('Invalid threat evidence data');
     }
 
-    logger.info('Threat retrieved', { id, organizationId, title: threat.title });
+    logger.info('Threat retrieved', { id, organizationId, title: (threat as any).title });
 
     const result = {
       ...threat,
       indicators,
       evidence,
-      mitreTactics: threat.mitreTactics ? threat.mitreTactics.split(',').filter(Boolean) : [],
+      mitreTactics: (threat as any).mitreTactics ? (threat as any).mitreTactics.split(',').filter(Boolean) : [],
     };
 
     // Cache the result
@@ -241,7 +241,7 @@ export class ThreatService {
     logger.warn('Threat created', {
       id: threat.id,
       organizationId,
-      title: threat.title,
+      title: (threat as any).title,
       severity: threat.severity,
       category: threat.category,
     });
@@ -258,8 +258,8 @@ export class ThreatService {
         sourceIp: threat.sourceIp || undefined,
         identityId: threat.identityId || undefined,
         organizationId,
-        title: threat.title,
-        description: threat.description,
+        title: (threat as any).title,
+        description: (threat as any).description,
         mitreTactics: data.mitreTactics,
         mitreTechniques: data.mitreId ? [data.mitreId] : undefined,
         indicators: validatedIndicators.map(i => `${i.type}:${i.value}`),

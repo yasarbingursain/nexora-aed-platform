@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { getStoredTokens } from '@/services/api';
 
 const API_BASE = '/api/v1/siem';
 
@@ -78,10 +79,10 @@ export function useSiem() {
   const [error, setError] = useState<string | null>(null);
 
   const getAuthHeaders = useCallback(() => {
-    const token = localStorage.getItem('accessToken');
+    const tokens = getStoredTokens();
     return {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tokens?.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : {}),
     };
   }, []);
 

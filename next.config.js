@@ -72,7 +72,7 @@ const nextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload',
           }]),
-          // Content Security Policy (relaxed for dev, strict for prod)
+          // Content Security Policy (relaxed for dev, strict with nonce for prod)
           {
             key: 'Content-Security-Policy',
             value: isDev ? [
@@ -87,7 +87,7 @@ const nextConfig = {
               "base-uri 'self'",
             ].join('; ') : [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'strict-dynamic' 'nonce-NONCE_PLACEHOLDER'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
@@ -97,6 +97,8 @@ const nextConfig = {
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
+              "upgrade-insecure-requests",
+              "block-all-mixed-content",
             ].join('; '),
           },
         ],

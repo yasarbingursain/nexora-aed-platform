@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getStoredTokens } from '@/services/api';
 
 interface ThreatEvent {
   id: string;
@@ -20,12 +21,12 @@ export function useLiveThreatFeed() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const tokens = getStoredTokens();
 
     const ws = io(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080', {
       transports: ['websocket'],
       withCredentials: true,
-      auth: token ? { token } : undefined,
+      auth: tokens?.accessToken ? { token: tokens.accessToken } : undefined,
     });
 
     ws.on('connect', () => {

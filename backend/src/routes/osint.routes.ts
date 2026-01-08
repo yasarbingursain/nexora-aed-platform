@@ -7,6 +7,8 @@ import { Router } from 'express';
 import { logger } from '@/utils/logger';
 import { getLatestThreatEvents, getThreatEventsForMap, getThreatStatistics } from '@/repositories/threat-events.repository';
 import { buildBlocklist, getBlocklistStats } from '@/services/osint/soar.service';
+import { authenticate } from '@/middleware/auth.middleware';
+import { tenantMiddleware } from '@/middleware/tenant.middleware';
 
 const router = Router();
 
@@ -14,10 +16,13 @@ const router = Router();
  * GET /api/v1/osint/threats/latest
  * Get latest threat events
  */
+router.use(authenticate);
+router.use(tenantMiddleware);
+
 router.get('/threats/latest', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 1000);
-    const organizationId = req.query.organizationId as string | undefined;
+    const organizationId = (req as any).tenant?.organizationId || (req.query.organizationId as string | undefined);
 
     const threats = await getLatestThreatEvents(limit, organizationId);
 
@@ -44,7 +49,7 @@ router.get('/threats/latest', async (req, res) => {
 router.get('/threats/map', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 200, 1000);
-    const organizationId = req.query.organizationId as string | undefined;
+    const organizationId = (req as any).tenant?.organizationId || (req.query.organizationId as string | undefined);
 
     const threats = await getThreatEventsForMap(limit, organizationId);
 
@@ -70,7 +75,7 @@ router.get('/threats/map', async (req, res) => {
  */
 router.get('/threats/stats', async (req, res) => {
   try {
-    const organizationId = req.query.organizationId as string | undefined;
+    const organizationId = (req as any).tenant?.organizationId || (req.query.organizationId as string | undefined);
 
     const stats = await getThreatStatistics(organizationId);
 
@@ -93,7 +98,7 @@ router.get('/threats/stats', async (req, res) => {
  * GET /api/v1/osint/soar/blocklist
  * Generate SOAR blocklist for WAF/Gateway integration
  */
-router.get('/soar/blocklist', async (req, res) => {
+router.get('/soar/blocklist', authenticate, async (req, res) => {
   try {
     const minRiskScore = parseInt(req.query.minRisk as string) || 60;
     const maxItems = Math.min(parseInt(req.query.maxItems as string) || 500, 5000);
@@ -117,7 +122,7 @@ router.get('/soar/blocklist', async (req, res) => {
  * GET /api/v1/osint/soar/stats
  * Get blocklist statistics
  */
-router.get('/soar/stats', async (req, res) => {
+router.get('/soar/stats', authenticate, async (req, res) => {
   try {
     const organizationId = req.query.organizationId as string | undefined;
 
@@ -142,7 +147,7 @@ router.get('/soar/stats', async (req, res) => {
  * POST /osint/ingest/trigger
  * Manually trigger OSINT ingestion (for testing)
  */
-router.post('/ingest/trigger', async (req, res) => {
+router.post('/ingest/trigger', authenticate, async (req, res) => {
   try {
     const { createOrchestratorFromEnv } = await import('@/services/osint/orchestrator.service');
     const orchestrator = createOrchestratorFromEnv();

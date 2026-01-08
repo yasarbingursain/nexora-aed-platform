@@ -9,6 +9,7 @@ import { Logo } from '@/components/ui/Logo';
 import Link from 'next/link';
 import { Eye, EyeOff, Github, Mail, Lock, User, Building, CheckCircle, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { registrationFormSchema, type RegistrationFormData } from '@/lib/validation/forms';
+import { storeTokens } from '@/services/api';
 
 const plans = [
   {
@@ -133,11 +134,22 @@ export default function SignUpPage() {
         throw new Error(data.message || data.error || 'Registration failed');
       }
 
-      if (data.accessToken) {
-        localStorage.setItem('accessToken', data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.accessToken && data.refreshToken) {
+        const parseJwtExp = (token: string): number => {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            return (payload.exp || 0) * 1000;
+          } catch {
+            return Date.now() + 60 * 60 * 1000;
+          }
+        };
+
+        storeTokens({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: parseJwtExp(data.accessToken),
+          tokenType: 'Bearer',
+        });
       }
 
       router.push('/client-dashboard');

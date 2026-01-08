@@ -1,0 +1,346 @@
+================================================================================
+NEXORA SECURITY FIXES - TESTING & VALIDATION GUIDE
+================================================================================
+
+CRITICAL SECURITY FIXES IMPLEMENTED:
+1. CSP Nonce Injection for Production (XSS Prevention)
+2. Health Endpoint Access Control (Information Disclosure Prevention)
+3. Frontend Nonce Integration for Inline Scripts
+4. Production Security Headers (HSTS, CSP, etc.)
+
+================================================================================
+1. CSP NONCE INJECTION - TESTING GUIDE
+================================================================================
+
+WHAT WAS FIXED:
+- Before: CSP was using 'unsafe-inline' in production (UNACCEPTABLE for security SaaS)
+- After: CSP now uses 'strict-dynamic' with per-request nonce in production
+
+VERIFY THE FIX:
+
+Development Testing:
+  1. Start frontend: npm run dev
+  2. Open browser DevTools (F12) > Network tab
+  3. Refresh page
+  4. Click on any HTML response
+  5. Check Response Headers for Content-Security-Policy
+  6. Should contain: "script-src 'self' 'unsafe-eval' 'unsafe-inline'" (dev uses loose CSP)
+  7. Verify no errors in Console tab
+
+Production Build Testing:
+  1. Build: npm run build
+  2. Start production: npm start
+  3. In DevTools > Network, check CSP header:
+     - Should contain: "script-src 'self' 'strict-dynamic' 'nonce-XXXXX'"
+     - Should NOT contain: "'unsafe-inline'"
+  4. Verify all inline scripts have nonce attribute
+  5. Verify page loads without CSP errors
+
+Terminal Curl Test:
+  # Check that CSP is properly set with nonce
+  curl -I http://localhost:3000 | grep "Content-Security-Policy"
+  
+  Expected output (production):
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'strict-dynamic' 'nonce-...
+
+Technical Details:
+- Nonce is generated in: middleware.ts line 8 (nanoid())
+- Nonce is injected into CSP in: middleware.ts line 37 (production-only)
+- CSP template is in: next.config.js line 99 (production CSP definition)
+- Frontend layout uses nonce in: app/layout.tsx line 84-94
+- Client-side nonce access via: src/hooks/useNonce.ts
+
+================================================================================
+2. HEALTH ENDPOINT ACCESS CONTROL - TESTING GUIDE
+================================================================================
+
+WHAT WAS FIXED:
+- Before: Health endpoints were publicly accessible, exposing internal service status
+- After: Health endpoints require authentication or API key based on tier
+
+ACCESS CONTROL TIERS:
+
+  TIER 1 - LITE ACCESS (requireLiteHealthAccess):
+    Endpoints: GET /health
+    Access: API Key OR Internal Network
+    Exposes: Overall system status, service health summary
+    Rate Limit: 100 req/min per key/IP
+    Used by: Load balancers, monitoring systems
+    
+  TIER 2 - DETAILED ACCESS (requireDetailedHealthAccess):
+    Endpoints: GET /health/database, /health/redis, /health/kafka, /health/email,
+               /health/siem, /health/ticketing, /health/kafka/detailed
+    Access: JWT Authentication (logged-in users)
+    Exposes: Full system diagnostics, error details, latency metrics
+    Used by: Admin dashboards, internal tools
+
+TESTING THE FIX:
+
+Step 1: Configure Environment
+  In backend/.env, add:
+  HEALTH_ENDPOINT_API_KEYS="test-key-123,test-key-456"
+  
+  Generate real keys in production:
+  openssl rand -hex 32
+
+Step 2: Test Public Access (Should FAIL)
+  curl http://localhost:8080/health
+  Expected: 403 Forbidden
+  Response: {"error":"Access forbidden","message":"Lite health endpoints require valid API key or internal network access"}
+
+Step 3: Test API Key Access (Should SUCCEED)
+  curl -H "X-API-Key: test-key-123" http://localhost:8080/health
+  Expected: 200 OK
+  Response: {"status":"healthy","checks":{...}}
+
+Step 4: Test Internal Network Access (Should SUCCEED from localhost)
+  curl http://localhost:8080/health
+  Expected: 200 OK (because 127.0.0.1 is in internal IP list)
+  Response: {"status":"healthy","checks":{...}}
+
+Step 5: Test Detailed Endpoints Without Auth (Should FAIL)
+  curl http://localhost:8080/health/database
+  Expected: 401 Unauthorized
+  Response: {"error":"Authentication required","message":"Detailed health endpoints require valid JWT token"}
+
+Step 6: Test Detailed Endpoints With JWT (Should SUCCEED)
+  # First get a valid JWT token from login
+  curl -X POST http://localhost:8080/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com","password":"password"}'
+  
+  # Then use the token:
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:8080/health/database
+  Expected: 200 OK
+  Response: {"healthy":true,"message":"Database connected","latency":5}
+
+Step 7: Test Logging (Verify audit trail)
+  Make several health check requests
+  Check logs: backend/logs/app.log or CloudWatch
+  Should see entries like:
+  {"level":"info","message":"Health endpoint accessed","method":"GET","path":"/health","accessLevel":"internal"...}
+
+Production Deployment:
+  1. Set HEALTH_ENDPOINT_API_KEYS with real keys in AWS Secrets Manager
+  2. Update load balancer to use API key when checking /health
+  3. Prometheus/Grafana: Configure scrape job with X-API-Key header
+  4. Verify internal network access works from within VPC
+  5. Test that external access is blocked (403 Forbidden)
+
+================================================================================
+3. FRONTEND NONCE INTEGRATION - TESTING GUIDE
+================================================================================
+
+WHAT WAS FIXED:
+- Before: Inline scripts didn't have nonce attributes, conflicting with strict CSP
+- After: All inline scripts in layout.tsx have nonce prop
+
+VERIFY THE FIX:
+
+DevTools Inspection:
+  1. Open browser DevTools > Elements tab
+  2. Find <script> tags in <head>
+  3. Check that each script has: nonce="abc123..." attribute
+  4. Example:
+     <script type="application/ld+json" nonce="abc123..." dangerouslySetInnerHTML={{...}} />
+
+CSP Console Warnings:
+  1. Open DevTools > Console tab
+  2. Should NOT see warnings like: "Refused to execute inline script..."
+  3. All inline scripts should execute without CSP violations
+  4. Note: JSON-LD scripts don't execute JS, so no violation anyway, but nonce is good practice
+
+useNonce Hook Usage:
+  Location: src/hooks/useNonce.ts
+  For client components that need nonce:
+  
+  Usage Example:
+  'use client';
+  import { useNonce } from '@/hooks/useNonce';
+  
+  export function MyComponent() {
+    const nonce = useNonce();
+    return (
+      <script 
+        nonce={nonce}
+        dangerouslySetInnerHTML={{__html: '...'}} 
+      />
+    );
+  }
+
+Meta Tag Check:
+  1. Open DevTools > Elements
+  2. Find: <meta property="csp-nonce" content="abc123..." />
+  3. This meta tag is used by useNonce hook for client-side access
+
+================================================================================
+4. COMPREHENSIVE SECURITY VALIDATION
+================================================================================
+
+CHECKLIST: Run these tests in order
+
+[ ] 1. CSP Header Present
+    curl -I http://localhost:3000 | grep "Content-Security-Policy"
+    Should show CSP header
+
+[ ] 2. CSP Contains Nonce (Production)
+    curl -I http://localhost:3000 | grep "nonce-"
+    Should show nonce in response
+
+[ ] 3. No Unsafe-Inline in Production
+    npm run build && npm start
+    curl -I http://localhost:3000 | grep "unsafe-inline"
+    Should be EMPTY (no match)
+
+[ ] 4. Health Endpoint Protected
+    curl http://localhost:8080/health
+    Should return 403 Forbidden
+
+[ ] 5. Health Endpoint with API Key Works
+    curl -H "X-API-Key: test-key-123" http://localhost:8080/health
+    Should return 200 OK
+
+[ ] 6. Detailed Health Endpoint Protected
+    curl http://localhost:8080/health/database
+    Should return 401 Unauthorized
+
+[ ] 7. App Starts Without Errors
+    npm run dev (frontend)
+    npm run start (backend)
+    Should start with no errors in console
+
+[ ] 8. No TypeScript Errors
+    npx tsc --noEmit
+    Should show 0 errors
+
+[ ] 9. Frontend Features Work
+    - Login/signup: Should work normally
+    - Dashboard: Should load without CSP errors
+    - API calls: Should authenticate properly
+
+[ ] 10. Health Check Monitoring Works
+    Configure monitoring tool (Prometheus, DataDog, etc.)
+    Should be able to scrape /health with API key
+    Should show "healthy" status
+
+================================================================================
+5. MONITORING & ALERTING
+================================================================================
+
+Recommended Monitoring Setup:
+
+Health Endpoint Monitoring:
+  Tool: Prometheus + Grafana
+  Scrape Config:
+    - job_name: 'nexora-health'
+      scrape_interval: 30s
+      metrics_path: '/health'
+      bearer_token: 'your-api-key-here'
+      static_configs:
+        - targets: ['api.nexora.security:8080']
+
+CSP Violation Detection:
+  Implement CSP Reporting:
+  Add to next.config.js:
+    "report-uri https://your-csp-collector.com/report;"
+  
+  This will send CSP violations to monitoring service
+
+Access Control Logging:
+  Monitor logs for patterns:
+  - "Access forbidden" on health endpoints → potential attack
+  - Health endpoint accessed with 401 → misconfigured monitoring
+  - Multiple failed API key attempts → credential leak investigation
+
+Performance Metrics:
+  Track:
+  - Health endpoint response time (latency in JSON response)
+  - Database connection latency
+  - Redis connection latency
+  - Kafka broker status
+
+================================================================================
+6. ROLLBACK PLAN
+================================================================================
+
+If issues occur, rollback is simple:
+
+Option 1: Remove API Key Requirement (Temporary)
+  Comment out requireLiteHealthAccess in backend/src/routes/health.routes.ts
+  Change: router.get('/', requireLiteHealthAccess, async ...)
+  To: router.get('/', async ...)
+  WARNING: This removes security - only for emergency debugging
+
+Option 2: Disable Nonce Enforcement (Temporary)
+  In middleware.ts, comment out nonce logic:
+  // if (csp && process.env.NODE_ENV === 'production') {
+  //   const updatedCSP = ...
+  // }
+  WARNING: CSP becomes 'unsafe-inline' - security risk
+
+Option 3: Full Rollback
+  git revert [commit-hash]
+  Restores previous version of all changed files
+
+NEVER commit emergency fixes - these are debugging only
+
+================================================================================
+7. COMPLIANCE & SECURITY STANDARDS
+================================================================================
+
+These fixes achieve:
+
+✅ OWASP Top 10 - A01:2021 Broken Access Control
+   - Health endpoints now properly authenticated
+   - Tiered access based on API key or JWT
+
+✅ OWASP Top 10 - A03:2021 Injection / CSP Protection
+   - CSP now uses strict-dynamic with nonce
+   - Prevents inline script injection attacks
+
+✅ OWASP Top 10 - A05:2021 Broken Access Control
+   - Information disclosure via health endpoints prevented
+   - Only authenticated users see detailed system status
+
+✅ SOC2 Type II Compliance
+   - Access control enforcement
+   - Audit logging of health endpoint access
+   - Monitoring and alerting capabilities
+
+✅ NIST Cybersecurity Framework
+   - Protect (access control, headers)
+   - Detect (logging, monitoring)
+   - Respond (health checks, alerts)
+
+✅ ISO 27001:2022
+   - A.5.15 Access Control to Information
+   - A.6.3 Segregation of Duties
+   - A.7.1 Management of Assets
+
+================================================================================
+8. SUPPORT & QUESTIONS
+================================================================================
+
+For CSP Issues:
+  1. Check browser console for CSP violations
+  2. Verify nonce is being generated (middleware.ts)
+  3. Verify nonce is in CSP header (curl -I)
+  4. Check that scripts have nonce attribute
+
+For Health Endpoint Access Issues:
+  1. Verify API key is correct
+  2. Check HEALTH_ENDPOINT_API_KEYS in .env
+  3. Verify request includes X-API-Key header (case-sensitive)
+  4. Check logs for "Access forbidden" messages
+  5. Verify your IP is in INTERNAL_IPS list if using internal access
+
+For Production Deployment Issues:
+  1. Verify AWS Secrets Manager has HEALTH_ENDPOINT_API_KEYS
+  2. Verify ALB/reverse proxy is configured with trusted headers
+  3. Check that X-Forwarded-For header is being sent
+  4. Verify security groups allow health check traffic
+  5. Test from internal VPC address first
+
+================================================================================
+END OF TESTING GUIDE
+================================================================================

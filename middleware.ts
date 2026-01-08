@@ -6,8 +6,10 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const url = request.nextUrl;
 
-  // Generate CSP nonce for inline scripts
+  // Generate CSP nonce for inline scripts (per OWASP CSP guidelines)
   const nonce = nanoid();
+  
+  // Set nonce in response headers for middleware use
   response.headers.set('x-nonce', nonce);
 
   // A/B Testing: Assign variant if on landing page
@@ -29,12 +31,13 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Update CSP header with nonce
+  // Update CSP header with nonce (production only uses nonce-based CSP)
   const csp = response.headers.get('Content-Security-Policy');
-  if (csp) {
+  if (csp && process.env.NODE_ENV === 'production') {
+    // Replace placeholder with actual nonce for production strict CSP
     const updatedCSP = csp.replace(
-      "script-src 'self' 'strict-dynamic'",
-      `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
+      "'nonce-NONCE_PLACEHOLDER'",
+      `'nonce-${nonce}'`
     );
     response.headers.set('Content-Security-Policy', updatedCSP);
   }

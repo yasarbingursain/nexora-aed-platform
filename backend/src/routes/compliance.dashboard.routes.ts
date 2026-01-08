@@ -5,8 +5,12 @@
 
 import { Router } from 'express';
 import { complianceDashboardController } from '@/controllers/compliance.dashboard.controller';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const router = Router();
+
+// Require authentication for compliance dashboard
+router.use(requireAuth);
 
 /**
  * GET /api/v1/compliance/status

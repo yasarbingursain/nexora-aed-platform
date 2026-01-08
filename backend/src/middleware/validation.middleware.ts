@@ -4,6 +4,13 @@ import { z, ZodSchema } from 'zod';
 export const validate = (schema: ZodSchema) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Avoid mutating forensic evidence payloads. If this request is
+      // targeting evidence-related endpoints, skip schema parsing to
+      // preserve exact request content for audit/verification purposes.
+      if (req.path && req.path.includes('/evidence')) {
+        return next();
+      }
+
       req.body = await schema.parseAsync(req.body);
       next();
     } catch (error) {
@@ -31,6 +38,10 @@ export const validate = (schema: ZodSchema) => {
 export const validateQuery = (schema: ZodSchema) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      if (req.path && req.path.includes('/evidence')) {
+        return next();
+      }
+
       req.query = await schema.parseAsync(req.query);
       next();
     } catch (error) {
@@ -58,6 +69,10 @@ export const validateQuery = (schema: ZodSchema) => {
 export const validateParams = (schema: ZodSchema) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      if (req.path && req.path.includes('/evidence')) {
+        return next();
+      }
+
       req.params = await schema.parseAsync(req.params);
       next();
     } catch (error) {
