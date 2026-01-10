@@ -494,14 +494,6 @@ export default function ClientDashboard() {
           </div>
         </div>
 
-        {/* MalGenX Malware Analysis Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-purple-500" />
-            MalGenX Malware Analysis
-          </h2>
-        </div>
-
         {/* Recent Activity */}
         <Card className="p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>

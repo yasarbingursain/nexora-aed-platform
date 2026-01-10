@@ -272,7 +272,7 @@ export default function ApiKeysManagementPage() {
               <h2 className="text-xl font-bold text-gray-900 mb-4">API Key Created</h2>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-yellow-800 font-medium mb-2">
-                  ⚠️ Save this key now - you won't be able to see it again!
+                  ⚠️ Save this key now - you won&apos;t be able to see it again!
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-4 py-3 bg-gray-900 text-green-400 rounded font-mono text-sm break-all">
@@ -293,7 +293,7 @@ export default function ApiKeysManagementPage() {
                 }}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                I've Saved the Key
+                I&apos;ve Saved the Key
               </button>
             </div>
           </div>
