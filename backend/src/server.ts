@@ -48,6 +48,10 @@ import cacheRoutes from '@/routes/v1/cache.routes';
 // SOC Routes
 import socRoutes from '@/routes/soc.routes';
 
+// IAM Admin Routes
+import orgAdminRoutes from '@/routes/org-admin.routes';
+import platformAdminRoutes from '@/routes/platform-admin.routes';
+
 // Explainable AI Routes
 import explainableAIRoutes from '@/routes/explainable-ai.routes';
 
@@ -193,6 +197,10 @@ app.use(`/api/${env.API_VERSION}/admin/cache`, cacheRoutes);
 
 // SOC (Security Operations Center)
 app.use(`/api/${env.API_VERSION}/soc`, socRoutes);
+
+// IAM Admin Routes
+app.use('/api/org/admin', orgAdminRoutes);
+app.use('/api/platform/admin', platformAdminRoutes);
 
 // Explainable AI (GDPR Article 22)
 app.use(`/api/${env.API_VERSION}/explain`, explainableAIRoutes);

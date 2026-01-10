@@ -327,7 +327,58 @@ export class IdentityService {
       }
     }
 
-    // TODO: Notify owner if requested
+    // Notify owner if requested
+    if (data.notifyOwner && identity.owner) {
+      try {
+        const { emailService } = await import('@/services/email.service');
+        
+        if (emailService.isConfigured()) {
+          await emailService.sendEmail({
+            to: identity.owner,
+            subject: `Security Alert: Identity "${identity.name}" Quarantined`,
+            html: `
+              <h2>Identity Quarantine Notification</h2>
+              <p>Your identity <strong>${identity.name}</strong> (${identity.type}) has been quarantined due to security concerns.</p>
+              <p><strong>Reason:</strong> ${data.reason}</p>
+              <p><strong>Action Taken:</strong> The identity has been isolated and all access has been revoked.</p>
+              <p><strong>Next Steps:</strong></p>
+              <ul>
+                <li>Review recent activity for this identity</li>
+                <li>Contact your security team for investigation</li>
+                <li>Do not attempt to use this identity until cleared</li>
+              </ul>
+              <p>If you believe this is an error, please contact your administrator immediately.</p>
+            `,
+            metadata: {
+              type: 'security_alert',
+              identityId: id,
+              organizationId,
+              severity: 'high',
+            },
+          });
+          
+          logger.info('Quarantine notification sent to owner', {
+            id,
+            organizationId,
+            owner: identity.owner,
+          });
+        } else {
+          logger.warn('Email service not configured, quarantine notification not sent', {
+            id,
+            organizationId,
+            owner: identity.owner,
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to send quarantine notification', {
+          id,
+          organizationId,
+          owner: identity.owner,
+          error,
+        });
+        // Don't throw - quarantine still applied
+      }
+    }
 
     return {
       success: true,
@@ -372,68 +423,6 @@ export class IdentityService {
     });
   }
 
-  /**
-   * Quarantine identity
-   */
-  async quarantine(id: string, organizationId: string, data: QuarantineIdentityInput) {
-    // Verify identity exists
-    const identity = await this.getById(id, organizationId);
-
-// Update status to quarantined
-await identityRepository.updateStatus(id, organizationId, 'quarantined');
-
-// Update risk level to critical
-await identityRepository.updateRiskLevel(id, organizationId, 'critical');
-
-logger.warn('Identity quarantined', {
-  id,
-  organizationId,
-  reason: data.reason,
-});
-
-// Record quarantine activity
-await identityRepository.recordActivity(
-  id,
-  'identity_quarantined',
-  'system',
-  {
-    reason: data.reason,
-    notifyOwner: data.notifyOwner,
-  }
-);
-
-// PRODUCTION: Real network quarantine
-const quarantinedIdentity = await this.getById(id, organizationId);
-  
-if (quarantinedIdentity.metadata) {
-  try {
-    const { awsQuarantineService } = await import('@/services/cloud/aws-quarantine.service');
-    
-    if (awsQuarantineService.isConfigured()) {
-      const metadata = quarantinedIdentity.metadata as any;
-      const ipAddress = metadata.lastSeenIP || metadata.sourceIP;
-      
-      if (ipAddress) {
-        await awsQuarantineService.quarantineIP(ipAddress, data.reason || 'Security threat detected');
-        logger.info('Network quarantine applied', { id, organizationId, ipAddress });
-      }
-    } else {
-      logger.warn('AWS quarantine service not configured, quarantine simulated', { id, organizationId });
-    }
-  } catch (error) {
-    logger.error('Network quarantine failed', { id, organizationId, error });
-    // Don't throw - DB quarantine still applied
-  }
-}
-
-// TODO: Notify owner if requested
-
-return {
-  success: true,
-  message: 'Identity quarantined successfully',
-  identity: await this.getById(id, organizationId),
-};
-}
 
   /**
    * Get identity activities

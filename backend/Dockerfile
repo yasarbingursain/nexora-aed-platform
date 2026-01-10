@@ -20,8 +20,8 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Install ts-node and typescript for running TypeScript directly
-RUN npm install --save-dev ts-node typescript @types/node
+# Install TypeScript, ts-node, and tsconfig-paths for path alias resolution
+RUN npm install --save-dev typescript @types/node ts-node tsconfig-paths
 
 # Production image, copy all the files and run the app
 FROM base AS runner
@@ -54,5 +54,5 @@ ENV PORT=8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:8080/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application with ts-node
-CMD ["npx", "ts-node", "src/server.ts"]
+# Start the application with ts-node and tsconfig-paths
+CMD ["node", "-r", "tsconfig-paths/register", "-r", "ts-node/register", "src/server.ts"]

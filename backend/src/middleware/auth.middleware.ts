@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '@/config/env';
 import { prisma } from '@/config/database';
+import { PermissionsService } from '@/services/permissions.service';
 
 export interface AuthenticatedUser {
   userId: string;
@@ -12,10 +13,21 @@ export interface AuthenticatedUser {
   exp: number;
 }
 
+export interface AuthContext {
+  userId: string;
+  organizationId: string;
+  mode: 'USER' | 'API_KEY' | 'IMPERSONATED';
+  effectivePermissions: string[];
+  roles: { platform: string[]; org: string[] };
+  teamIds: string[];
+  impersonationSessionId?: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
       user?: AuthenticatedUser;
+      auth?: AuthContext;
     }
   }
 }
@@ -95,6 +107,32 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       role: user.role,
       iat: decoded.iat,
       exp: decoded.exp,
+    };
+
+    // Check for active impersonation session
+    const impersonationSession = await prisma.impersonationSession.findFirst({
+      where: {
+        targetUserId: user.id,
+        expiresAt: { gt: new Date() },
+        endedAt: null,
+      },
+    });
+
+    // Compute effective permissions
+    const effectivePerms = await PermissionsService.getEffectivePermissions(
+      user.id,
+      user.organizationId,
+      impersonationSession ? 'IMPERSONATED' : 'USER'
+    );
+
+    req.auth = {
+      userId: user.id,
+      organizationId: user.organizationId,
+      mode: impersonationSession ? 'IMPERSONATED' : 'USER',
+      effectivePermissions: effectivePerms.permissions,
+      roles: effectivePerms.roles,
+      teamIds: effectivePerms.teamIds,
+      impersonationSessionId: impersonationSession?.id,
     };
 
     next();
@@ -193,6 +231,18 @@ export const requireApiKey = async (req: Request, res: Response, next: NextFunct
       role: 'api',
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+    };
+
+    // Get API key scopes
+    const permissions = await PermissionsService.getApiKeyPermissions(apiKeyRecord.id);
+
+    req.auth = {
+      userId: 'api-key',
+      organizationId: apiKeyRecord.organizationId,
+      mode: 'API_KEY',
+      effectivePermissions: permissions,
+      roles: { platform: [], org: [] },
+      teamIds: [],
     };
 
     next();

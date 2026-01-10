@@ -17,7 +17,8 @@ import {
   Flame,
   GitBranch,
   Activity,
-  Brain
+  Brain,
+  UserCog
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

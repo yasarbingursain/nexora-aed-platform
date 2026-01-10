@@ -48,6 +48,9 @@ model Organization {
   adminActions      AdminAuditLog[]
   evidenceLogs      EvidenceLog[]
   notifications     Notification[]
+  invites           Invite[]
+  impersonationSessions ImpersonationSession[]
+  iamAuditLogs      IamAuditLog[]   @relation("IamOrg")
 
   @@map("organizations")
 }
@@ -81,6 +84,9 @@ model User {
   // Password Reset Fields
   passwordResetToken   String?
   passwordResetExpires DateTime?
+  
+  // IAM Cache Versioning
+  permissionsVersion Int @default(1)
 
   // Relations
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -90,6 +96,12 @@ model User {
   adminActions   AdminAuditLog[] @relation("AdminActions")
   securityEvents SecurityEvent[]
   notifications  Notification[]
+  userRoles      UserRole[]
+  teamMembers    TeamMember[]
+  invitesSent    Invite[]        @relation("InvitedBy")
+  supportSessions ImpersonationSession[] @relation("SupportUser")
+  targetSessions  ImpersonationSession[] @relation("TargetUser")
+  iamAuditLogs    IamAuditLog[]   @relation("IamActor")
 
   @@index([lockedUntil])
   @@index([email, lockedUntil])
@@ -148,6 +160,7 @@ model ApiKey {
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scopes       ApiKeyScope[]
 
   @@map("api_keys")
 }
@@ -1020,4 +1033,190 @@ model SiemEventLog {
   @@index([createdAt(sort: Desc)])
   @@index([eventId])
   @@map("siem_event_log")
+}
+
+// =============================================================================
+// ENTERPRISE IAM MODELS
+// =============================================================================
+
+enum RoleScope {
+  PLATFORM
+  ORG
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String
+  riskLevel   String   @default("LOW")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+  teamPermissions TeamPermission[]
+  apiKeyScopes    ApiKeyScope[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id             String    @id @default(cuid())
+  scope          RoleScope
+  organizationId String?
+  name           String
+  description    String?
+  isSystem       Boolean   @default(false)
+  parentRoleId   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  parentRole     Role?     @relation("RoleInheritance", fields: [parentRoleId], references: [id])
+  childRoles     Role[]    @relation("RoleInheritance")
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+  invites         Invite[]
+
+  @@unique([scope, name], name: "platform_role_name", map: "roles_scope_name_key")
+  @@unique([organizationId, name], name: "org_role_name", map: "roles_organizationId_name_key")
+  @@index([organizationId])
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members        TeamMember[]
+  permissions    TeamPermission[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+model TeamMember {
+  teamId String
+  userId String
+
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model TeamPermission {
+  teamId       String
+  permissionId String
+
+  team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, permissionId])
+  @@map("team_permissions")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model Invite {
+  id              String   @id @default(cuid())
+  organizationId  String
+  email           String
+  tokenHash       String
+  expiresAt       DateTime
+  invitedByUserId String
+  defaultRoleId   String?
+  createdAt       DateTime @default(now())
+  acceptedAt      DateTime?
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy       User         @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+  defaultRole     Role?        @relation(fields: [defaultRoleId], references: [id])
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("invites")
+}
+
+model ApiKeyScope {
+  apiKeyId     String
+  permissionId String
+
+  apiKey       ApiKey     @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([apiKeyId, permissionId])
+  @@map("api_key_scopes")
+}
+
+model ImpersonationSession {
+  id             String   @id @default(cuid())
+  supportUserId  String
+  targetUserId   String
+  organizationId String
+  ticketId       String
+  reason         String
+  startedAt      DateTime @default(now())
+  expiresAt      DateTime
+  endedAt        DateTime?
+  ip             String?
+  userAgent      String?
+
+  supportUser    User @relation("SupportUser", fields: [supportUserId], references: [id])
+  targetUser     User @relation("TargetUser", fields: [targetUserId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([targetUserId, expiresAt])
+  @@index([supportUserId, expiresAt])
+  @@index([organizationId])
+  @@map("impersonation_sessions")
+}
+
+model IamAuditLog {
+  id             String   @id @default(cuid())
+  actorUserId    String
+  organizationId String?
+  action         String
+  targetType     String
+  targetId       String
+  before         Json?
+  after          Json?
+  requestId      String?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  actor          User @relation("IamActor", fields: [actorUserId], references: [id])
+  organization   Organization? @relation("IamOrg", fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("iam_audit_logs")
 }

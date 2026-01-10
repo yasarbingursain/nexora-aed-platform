@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AuthController } from '@/controllers/auth.controller';
+import { AdminUsersController } from '@/controllers/admin-users.controller';
 import { TokenRotationService } from '@/services/token-rotation.service';
 import { validate } from '@/middleware/validation.middleware';
 import { requireAuth, requireRole } from '@/middleware/auth.middleware';
@@ -78,29 +79,35 @@ router.post('/mfa/disable',
   AuthController.disableMfa
 );
 
-// Admin only routes
+// Admin only routes - User Management
 router.get('/users',
   requireRole(['admin']),
-  // TODO: Implement list users controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AdminUsersController.listUsers
+);
+
+router.get('/users/:id',
+  requireRole(['admin']),
+  AdminUsersController.getUser
 );
 
 router.post('/users',
   requireRole(['admin']),
-  // TODO: Implement create user controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AdminUsersController.createUser
 );
 
-router.put('/users/:id',
+router.patch('/users/:id',
   requireRole(['admin']),
-  // TODO: Implement update user controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AdminUsersController.updateUser
 );
 
 router.delete('/users/:id',
   requireRole(['admin']),
-  // TODO: Implement delete user controller
-  (req, res) => res.status(501).json({ error: 'Not implemented' })
+  AdminUsersController.deleteUser
+);
+
+router.post('/users/:id/reset-password',
+  requireRole(['admin']),
+  AdminUsersController.resetUserPassword
 );
 
 export default router;
