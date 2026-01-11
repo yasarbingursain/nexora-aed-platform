@@ -164,9 +164,9 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-background py-12 px-6">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
-            <Logo size="lg" animated />
-          </Link>
+          <div className="flex justify-center mb-8">
+            <Logo size="lg" />
+          </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Start Your Free Trial</h1>
           <p className="text-muted-foreground">Join 150+ companies securing their non-human identities</p>
         </div>

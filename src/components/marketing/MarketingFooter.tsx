@@ -20,10 +20,10 @@ export function MarketingFooter() {
           <div>
             <h4 className="font-semibold text-foreground mb-4">Product</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#product" className="hover:text-foreground transition-colors">Features</a></li>
-              <li><a href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</a></li>
-              <li><a href="#use-cases" className="hover:text-foreground transition-colors">Use Cases</a></li>
-              <li><a href="#integrations" className="hover:text-foreground transition-colors">Integrations</a></li>
+              <li><a href="/#product" className="hover:text-foreground transition-colors">Features</a></li>
+              <li><a href="/#how-it-works" className="hover:text-foreground transition-colors">How It Works</a></li>
+              <li><a href="/#use-cases" className="hover:text-foreground transition-colors">Use Cases</a></li>
+              <li><a href="/#integrations" className="hover:text-foreground transition-colors">Integrations</a></li>
             </ul>
           </div>
           

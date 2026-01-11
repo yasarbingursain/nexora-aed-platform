@@ -2,6 +2,7 @@ import { MarketingHeader } from '@/components/marketing/MarketingHeader';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { Hero } from '@/components/marketing/Hero';
 import { TrustStrip } from '@/components/marketing/TrustStrip';
+import { ProductPreview } from '@/components/marketing/ProductPreview';
 import { Problem } from '@/components/marketing/Problem';
 import { WhatWeDo } from '@/components/marketing/WhatWeDo';
 import { HowItWorks } from '@/components/marketing/HowItWorks';
@@ -161,16 +162,16 @@ export default function LandingPage() {
 
       <Integrations
         title="Integrate without ripping and replacing."
-        disclaimer="Start in observe-only mode, then enable enforcement once you're comfortable with policy behavior."
+        disclaimer="Availability depends on plan and deployment mode. Start in observe-only mode, then enable enforcement once comfortable with policy behavior."
         items={[
-          { name: "GitHub Actions", status: "Supported" },
-          { name: "AWS IAM", status: "Supported" },
-          { name: "Azure AD", status: "Supported" },
-          { name: "Google Cloud IAM", status: "Supported" },
-          { name: "Kubernetes", status: "Supported" },
-          { name: "Docker", status: "Beta" },
-          { name: "Jenkins", status: "Beta" },
-          { name: "GitLab CI", status: "Beta" },
+          { name: "GitHub Actions", status: "Available" },
+          { name: "AWS IAM", status: "Available" },
+          { name: "Azure AD", status: "Available" },
+          { name: "Google Cloud IAM", status: "Available" },
+          { name: "Kubernetes", status: "Available" },
+          { name: "Docker", status: "Early Access" },
+          { name: "Jenkins", status: "Early Access" },
+          { name: "GitLab CI", status: "Early Access" },
           { name: "Terraform Cloud", status: "Roadmap" },
           { name: "CircleCI", status: "Roadmap" },
           { name: "Okta", status: "Roadmap" },

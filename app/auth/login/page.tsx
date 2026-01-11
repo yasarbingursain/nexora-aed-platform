@@ -125,9 +125,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
-            <Logo size="lg" animated />
-          </Link>
+          <div className="flex justify-center mb-8">
+            <Logo size="lg" />
+          </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>
           <p className="text-muted-foreground">Sign in to your Nexora account</p>
         </div>

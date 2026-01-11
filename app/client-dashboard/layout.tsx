@@ -21,6 +21,7 @@ import {
   UserCog
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/hooks/use-notifications';
 
 const navigation = [
   { name: 'Dashboard', href: '/client-dashboard', icon: Home },
@@ -55,11 +56,11 @@ export default function ClientDashboardLayout({
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center px-6">
-          <Link href="/" className="flex items-center gap-2 mr-8">
+          <Link href="/" className="flex items-center mr-8">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">N</span>
             </div>
-            <span className="font-bold text-lg">Nexora</span>
+            <span className="font-bold text-lg ml-2">Nexora</span>
           </Link>
 
           <nav className="flex items-center gap-6 flex-1">

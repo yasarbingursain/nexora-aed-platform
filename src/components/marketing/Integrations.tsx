@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 
-type IntegrationStatus = "Supported" | "Beta" | "Roadmap";
+type IntegrationStatus = "Available" | "Early Access" | "Roadmap";
 
 type IntegrationsProps = {
   title: string;
@@ -12,9 +12,9 @@ type IntegrationsProps = {
 export function Integrations({ title, items, disclaimer }: IntegrationsProps) {
   const getStatusVariant = (status: IntegrationStatus) => {
     switch (status) {
-      case "Supported":
+      case "Available":
         return "default";
-      case "Beta":
+      case "Early Access":
         return "secondary";
       case "Roadmap":
         return "outline";
