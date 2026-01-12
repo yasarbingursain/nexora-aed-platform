@@ -277,7 +277,7 @@ resource "aws_ecs_task_definition" "backend" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.backend}/health || exit 1"]
+        command     = ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${local.ports.backend}/health/alb || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3

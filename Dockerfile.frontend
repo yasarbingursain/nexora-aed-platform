@@ -5,7 +5,7 @@
 # Enterprise-grade with security hardening and health checks
 # =============================================================================
 
-FROM node:20-alpine AS base
+FROM public.ecr.aws/docker/library/node:20-alpine AS base
 
 # =============================================================================
 # STAGE 1: Dependencies

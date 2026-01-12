@@ -188,7 +188,6 @@ output "cloudwatch_log_groups" {
     frontend   = aws_cloudwatch_log_group.frontend.name
     backend    = aws_cloudwatch_log_group.backend.name
     ml_service = aws_cloudwatch_log_group.ml_service.name
-    malgenx    = aws_cloudwatch_log_group.malgenx.name
   }
 }
 

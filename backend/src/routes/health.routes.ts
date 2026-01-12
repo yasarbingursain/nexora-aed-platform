@@ -35,6 +35,24 @@ const router = Router();
 router.use(logHealthAccess);
 
 /**
+ * GET /health/alb
+ * Public health check for ALB (NO AUTHENTICATION)
+ * 
+ * Simple liveness check for load balancer health checks.
+ * Returns 200 OK if service is running.
+ * 
+ * @security None
+ * @returns {200} Service is alive
+ */
+router.get('/alb', async (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'nexora-api'
+  });
+});
+
+/**
  * GET /health
  * Overall system health check (LITE ACCESS)
  * 

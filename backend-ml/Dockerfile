@@ -5,7 +5,7 @@
 # Enterprise-grade with security hardening and health checks
 # =============================================================================
 
-FROM python:3.11-slim AS base
+FROM public.ecr.aws/docker/library/python:3.11-slim AS base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -48,7 +48,7 @@ ENV PATH=/home/mluser/.local/bin:$PATH
 
 # Copy application code
 COPY --chown=mluser:mlservice app/ ./app/
-COPY --chown=mluser:mlservice models/ ./models/ 2>/dev/null || mkdir -p ./models
+RUN mkdir -p ./models
 
 # Create models directory if it doesn't exist
 RUN mkdir -p /app/models && chown -R mluser:mlservice /app/models

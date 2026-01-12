@@ -1,0 +1,45 @@
+version: 0.2
+
+# =============================================================================
+# Nexora ML Service - CodeBuild Buildspec
+# =============================================================================
+# Builds ML service Docker image and pushes to ECR
+# =============================================================================
+
+env:
+  variables:
+    AWS_REGION: "us-east-1"
+    ECR_REPO_NAME: "nexora-dev-ml-service"
+    IMAGE_TAG: "build-${CODEBUILD_BUILD_NUMBER}"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging into Amazon ECR..."
+      - aws --version
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - ECR_REPO_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
+      - echo "ECR Repository URI - $ECR_REPO_URI"
+      - echo "Listing source directory..."
+      - ls -la
+      
+  build:
+    commands:
+      - echo "Build started on `date`"
+      - echo "Building ML service Docker image..."
+      - docker build -f backend-ml/Dockerfile -t $ECR_REPO_URI:$IMAGE_TAG ./backend-ml
+      - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
+      
+  post_build:
+    commands:
+      - echo "Build completed on `date`"
+      - echo "Pushing Docker images to ECR..."
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - docker push $ECR_REPO_URI:latest
+      - echo "Writing image definitions file..."
+      - printf '[{"name":"ml-service","imageUri":"%s"}]' "$ECR_REPO_URI:$IMAGE_TAG" > imagedefinitions.json
+      - cat imagedefinitions.json
+
+artifacts:
+  files:
+    - imagedefinitions.json

@@ -121,8 +121,8 @@ resource "aws_secretsmanager_secret" "app_secrets" {
 resource "aws_secretsmanager_secret_version" "app_secrets" {
   secret_id = aws_secretsmanager_secret.app_secrets.id
   secret_string = jsonencode({
-    stripe_secret_key     = "sk_test_REPLACE_ME"
-    stripe_webhook_secret = "whsec_REPLACE_ME"
+    stripe_secret_key     = ""
+    stripe_webhook_secret = ""
     otx_api_key           = ""
     censys_api_token      = ""
     sentry_dsn            = ""
